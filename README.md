@@ -1,24 +1,7 @@
-# README
+# Relay RB
 
-This README would normally document whatever steps are necessary to get the
-application up and running.
+A Nostr relay implementation built with Ruby on Rails.
 
-Things you may want to cover:
+## Overview
 
-* Ruby version
-
-* System dependencies
-
-* Configuration
-
-* Database creation
-
-* Database initialization
-
-* How to run the test suite
-
-* Services (job queues, cache servers, search engines, etc.)
-
-* Deployment instructions
-
-* ...
+Relay RB is a [Nostr](https://nostr.com) relay server that implements the Nostr protocol (NIP-01) and related NIPs. Nostr (Notes and Other Stuff Transmitted by Relays) is a decentralized protocol for social networking and other applications.
