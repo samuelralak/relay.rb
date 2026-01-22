@@ -10,10 +10,57 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_01_22_212445) do
+ActiveRecord::Schema[8.1].define(version: 2026_01_22_220334) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pgcrypto"
   enable_extension "uuid-ossp"
 
+  create_table "event_tags", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.datetime "deleted_at"
+    t.uuid "event_id", null: false
+    t.integer "kind", null: false
+    t.datetime "nostr_created_at", null: false
+    t.integer "tag_index", null: false
+    t.string "tag_name", limit: 1, null: false
+    t.string "tag_value", limit: 255, null: false
+    t.datetime "updated_at", null: false
+    t.index ["deleted_at"], name: "idx_event_tags_deleted_at"
+    t.index ["event_id"], name: "index_event_tags_on_event_id"
+    t.index ["tag_name", "kind", "tag_value", "nostr_created_at", "event_id"], name: "idx_event_tags_kind_covering", order: { nostr_created_at: :desc }
+    t.index ["tag_name", "tag_value", "nostr_created_at", "event_id"], name: "idx_event_tags_covering", order: { nostr_created_at: :desc }
+    t.index ["tag_name", "tag_value"], name: "idx_event_tags_lookup"
+  end
+
+  create_table "events", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.text "content", default: "", null: false
+    t.datetime "created_at", null: false
+    t.string "d_tag", limit: 255
+    t.datetime "deleted_at"
+    t.string "event_id", limit: 64, null: false
+    t.datetime "expires_at"
+    t.datetime "first_seen_at", null: false
+    t.integer "kind", null: false
+    t.datetime "nostr_created_at", null: false
+    t.string "pubkey", limit: 64, null: false
+    t.jsonb "raw_event", null: false
+    t.string "sig", limit: 128, null: false
+    t.jsonb "tags", default: [], null: false
+    t.datetime "updated_at", null: false
+    t.index ["deleted_at"], name: "idx_events_deleted_at"
+    t.index ["event_id"], name: "idx_events_event_id", unique: true
+    t.index ["expires_at"], name: "idx_events_expires_at", where: "(expires_at IS NOT NULL)"
+    t.index ["kind", "nostr_created_at"], name: "idx_events_kind_created_at", order: { nostr_created_at: :desc }
+    t.index ["pubkey", "kind", "d_tag"], name: "idx_events_addressable", where: "(d_tag IS NOT NULL)"
+    t.index ["pubkey", "kind"], name: "idx_events_pubkey_kind"
+    t.index ["pubkey", "nostr_created_at"], name: "idx_events_pubkey_created_at", order: { nostr_created_at: :desc }
+    t.index ["tags"], name: "idx_events_tags_gin", using: :gin
+    t.check_constraint "event_id::text ~ '^[a-f0-9]{64}$'::text", name: "check_event_id_hex"
+    t.check_constraint "kind >= 0 AND kind <= 65535", name: "check_kind_range"
+    t.check_constraint "pubkey::text ~ '^[a-f0-9]{64}$'::text", name: "check_pubkey_hex"
+    t.check_constraint "sig::text ~ '^[a-f0-9]{128}$'::text", name: "check_sig_hex"
+  end
+
+  add_foreign_key "event_tags", "events", on_delete: :cascade
 end
