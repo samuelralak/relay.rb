@@ -1,0 +1,73 @@
+# Fixtures for EventTag model testing
+# Tags are extracted from events and stored for efficient querying
+
+# Tags from text_note event
+text_note_p_tag:
+  event: text_note
+  tag_name: "p"
+  tag_value: "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+  tag_index: 0
+  nostr_created_at: <%= 1.hour.ago.utc %>
+  kind: 1
+
+text_note_t_tag:
+  event: text_note
+  tag_name: "t"
+  tag_value: "nostr"
+  tag_index: 1
+  nostr_created_at: <%= 1.hour.ago.utc %>
+  kind: 1
+
+# Tags from follows event
+follows_p_tag:
+  event: follows
+  tag_name: "p"
+  tag_value: "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+  tag_index: 0
+  nostr_created_at: <%= 30.minutes.ago.utc %>
+  kind: 3
+
+# Tags from reaction event
+reaction_e_tag:
+  event: reaction
+  tag_name: "e"
+  tag_value: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  tag_index: 0
+  nostr_created_at: <%= 15.minutes.ago.utc %>
+  kind: 7
+
+reaction_p_tag:
+  event: reaction
+  tag_name: "p"
+  tag_value: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+  tag_index: 1
+  nostr_created_at: <%= 15.minutes.ago.utc %>
+  kind: 7
+
+# Tags from long_form event
+long_form_d_tag:
+  event: long_form
+  tag_name: "d"
+  tag_value: "my-article"
+  tag_index: 0
+  nostr_created_at: <%= 5.minutes.ago.utc %>
+  kind: 30023
+
+# Tags from other_author_note
+other_author_t_tag:
+  event: other_author_note
+  tag_name: "t"
+  tag_value: "bitcoin"
+  tag_index: 0
+  nostr_created_at: <%= 10.minutes.ago.utc %>
+  kind: 1
+
+# Deleted tag (for testing soft delete)
+deleted_tag:
+  event: text_note
+  tag_name: "r"
+  tag_value: "https://example.com"
+  tag_index: 2
+  nostr_created_at: <%= 1.hour.ago.utc %>
+  kind: 1
+  deleted_at: <%= 30.minutes.ago.utc %>

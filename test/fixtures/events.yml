@@ -1,0 +1,101 @@
+# Fixtures for Event model testing
+# Uses valid Nostr format: 64-char hex for event_id/pubkey, 128-char hex for sig
+
+# Regular text note (kind 1)
+text_note:
+  event_id: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  pubkey: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+  nostr_created_at: <%= 1.hour.ago.utc %>
+  kind: 1
+  tags: <%= [["p", "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"], ["t", "nostr"]].to_json %>
+  content: "Hello, Nostr!"
+  sig: <%= "d" * 128 %>
+  raw_event: <%= { id: "a" * 64, pubkey: "b" * 64, created_at: 1.hour.ago.to_i, kind: 1, tags: [], content: "Hello, Nostr!", sig: "d" * 128 }.to_json %>
+  first_seen_at: <%= 1.hour.ago.utc %>
+
+# Metadata event (kind 0 - replaceable)
+metadata:
+  event_id: "1111111111111111111111111111111111111111111111111111111111111111"
+  pubkey: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+  nostr_created_at: <%= 2.hours.ago.utc %>
+  kind: 0
+  tags: <%= [].to_json %>
+  content: <%= { name: "Alice", about: "Nostr enthusiast" }.to_json %>
+  sig: <%= "e" * 128 %>
+  raw_event: <%= { id: "1" * 64, pubkey: "b" * 64, created_at: 2.hours.ago.to_i, kind: 0, tags: [], content: "{}", sig: "e" * 128 }.to_json %>
+  first_seen_at: <%= 2.hours.ago.utc %>
+
+# Follow list (kind 3 - replaceable)
+follows:
+  event_id: "2222222222222222222222222222222222222222222222222222222222222222"
+  pubkey: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+  nostr_created_at: <%= 30.minutes.ago.utc %>
+  kind: 3
+  tags: <%= [["p", "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"]].to_json %>
+  content: ""
+  sig: <%= "f" * 128 %>
+  raw_event: <%= { id: "2" * 64, pubkey: "b" * 64, created_at: 30.minutes.ago.to_i, kind: 3, tags: [], content: "", sig: "f" * 128 }.to_json %>
+  first_seen_at: <%= 30.minutes.ago.utc %>
+
+# Reaction (kind 7)
+reaction:
+  event_id: "3333333333333333333333333333333333333333333333333333333333333333"
+  pubkey: "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+  nostr_created_at: <%= 15.minutes.ago.utc %>
+  kind: 7
+  tags: <%= [["e", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"], ["p", "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"]].to_json %>
+  content: "+"
+  sig: <%= "a" * 128 %>
+  raw_event: <%= { id: "3" * 64, pubkey: "c" * 64, created_at: 15.minutes.ago.to_i, kind: 7, tags: [], content: "+", sig: "a" * 128 }.to_json %>
+  first_seen_at: <%= 15.minutes.ago.utc %>
+
+# Long-form content (kind 30023 - addressable)
+long_form:
+  event_id: "4444444444444444444444444444444444444444444444444444444444444444"
+  pubkey: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+  nostr_created_at: <%= 5.minutes.ago.utc %>
+  kind: 30023
+  tags: <%= [["d", "my-article"], ["title", "My First Article"]].to_json %>
+  content: "This is a long-form article..."
+  sig: <%= "b" * 128 %>
+  raw_event: <%= { id: "4" * 64, pubkey: "b" * 64, created_at: 5.minutes.ago.to_i, kind: 30023, tags: [["d", "my-article"]], content: "...", sig: "b" * 128 }.to_json %>
+  d_tag: "my-article"
+  first_seen_at: <%= 5.minutes.ago.utc %>
+
+# Expired event
+expired_event:
+  event_id: "5555555555555555555555555555555555555555555555555555555555555555"
+  pubkey: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+  nostr_created_at: <%= 1.day.ago.utc %>
+  kind: 1
+  tags: <%= [["expiration", (1.hour.ago.to_i).to_s]].to_json %>
+  content: "This event has expired"
+  sig: <%= "c" * 128 %>
+  raw_event: <%= { id: "5" * 64, pubkey: "b" * 64, created_at: 1.day.ago.to_i, kind: 1, tags: [], content: "...", sig: "c" * 128 }.to_json %>
+  expires_at: <%= 1.hour.ago.utc %>
+  first_seen_at: <%= 1.day.ago.utc %>
+
+# Deleted event
+deleted_event:
+  event_id: "6666666666666666666666666666666666666666666666666666666666666666"
+  pubkey: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+  nostr_created_at: <%= 2.days.ago.utc %>
+  kind: 1
+  tags: <%= [].to_json %>
+  content: "This event was deleted"
+  sig: <%= "a" * 128 %>
+  raw_event: <%= { id: "6" * 64, pubkey: "b" * 64, created_at: 2.days.ago.to_i, kind: 1, tags: [], content: "...", sig: "a" * 128 }.to_json %>
+  deleted_at: <%= 1.day.ago.utc %>
+  first_seen_at: <%= 2.days.ago.utc %>
+
+# Second author's note (for multi-author queries)
+other_author_note:
+  event_id: "7777777777777777777777777777777777777777777777777777777777777777"
+  pubkey: "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+  nostr_created_at: <%= 10.minutes.ago.utc %>
+  kind: 1
+  tags: <%= [["t", "bitcoin"]].to_json %>
+  content: "Hello from another author"
+  sig: <%= "f" * 128 %>
+  raw_event: <%= { id: "7" * 64, pubkey: "e" * 64, created_at: 10.minutes.ago.to_i, kind: 1, tags: [], content: "...", sig: "f" * 128 }.to_json %>
+  first_seen_at: <%= 10.minutes.ago.utc %>
