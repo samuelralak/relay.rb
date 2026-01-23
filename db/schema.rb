@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_01_22_220334) do
+ActiveRecord::Schema[8.1].define(version: 2026_01_23_074603) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pgcrypto"
@@ -60,6 +60,25 @@ ActiveRecord::Schema[8.1].define(version: 2026_01_22_220334) do
     t.check_constraint "kind >= 0 AND kind <= 65535", name: "check_kind_range"
     t.check_constraint "pubkey::text ~ '^[a-f0-9]{64}$'::text", name: "check_pubkey_hex"
     t.check_constraint "sig::text ~ '^[a-f0-9]{128}$'::text", name: "check_sig_hex"
+  end
+
+  create_table "sync_states", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.string "direction", limit: 10, default: "down", null: false
+    t.text "error_message"
+    t.integer "events_downloaded", default: 0, null: false
+    t.integer "events_uploaded", default: 0, null: false
+    t.string "filter_hash", limit: 64
+    t.string "last_download_event_id", limit: 64
+    t.datetime "last_download_timestamp"
+    t.datetime "last_synced_at"
+    t.string "last_upload_event_id", limit: 64
+    t.datetime "last_upload_timestamp"
+    t.string "relay_url", limit: 255, null: false
+    t.string "status", limit: 20, default: "idle", null: false
+    t.datetime "updated_at", null: false
+    t.index ["relay_url", "filter_hash"], name: "idx_sync_states_relay_filter", unique: true
+    t.index ["status"], name: "idx_sync_states_status"
   end
 
   add_foreign_key "event_tags", "events", on_delete: :cascade
