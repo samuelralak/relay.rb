@@ -17,8 +17,9 @@ module Negentropy
       message_hex = reconciler.initiate
 
       message = Message.from_hex(message_hex)
-      assert_equal 1, message.size
-      assert message.ranges.first.skip?
+      # Trailing skips are optimized away per protocol spec
+      # Empty storage produces a skip which is optimized to empty message
+      assert_equal 0, message.size
     end
 
     test "initiate with items sends fingerprint" do
@@ -188,6 +189,33 @@ module Negentropy
       # The initial message should have fingerprint(s)
       message = Message.from_hex(message_hex)
       assert message.ranges.any?(&:fingerprint?)
+    end
+
+    test "defers ranges preserves alignment when frame limit reached" do
+      storage = Storage.new
+      storage.add({ id: "a" * 64, created_at: 100 })
+      storage.add({ id: "b" * 64, created_at: 200 })
+      storage.add({ id: "c" * 64, created_at: 400_000_000 })
+      storage.seal
+
+      upper = Bound.new(300_000_000, "\x00".b * Bound::ID_SIZE)
+      message = Message.new
+      message.add_fingerprint(upper, storage.fingerprint(Bound.min, upper))
+      message.add_fingerprint(Bound.max, storage.fingerprint(upper, Bound.max))
+
+      reconciler = Reconciler.new(storage: storage, frame_size_limit: 1039)
+      response_hex, have_ids, need_ids = reconciler.reconcile(message.to_hex)
+
+      assert response_hex, "Expected a response when frame limit defers ranges"
+      assert_empty have_ids
+      assert_empty need_ids
+
+      response = Message.from_hex(response_hex)
+      assert_equal 2, response.size
+      assert response.ranges.first.skip?
+      assert_equal upper, response.ranges.first.upper_bound
+      assert response.ranges.last.fingerprint?
+      assert_equal Bound.max, response.ranges.last.upper_bound
     end
 
     private

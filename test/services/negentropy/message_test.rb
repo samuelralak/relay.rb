@@ -50,8 +50,8 @@ module Negentropy
       encoded = message.encode
       decoded = Message.decode(encoded)
 
-      assert_equal 1, decoded.size
-      assert decoded.ranges.first.skip?
+      # Trailing skips are optimized away per protocol spec
+      assert_equal 0, decoded.size
     end
 
     test "encode and decode fingerprint message" do
@@ -91,10 +91,10 @@ module Negentropy
       encoded = message.encode
       decoded = Message.decode(encoded)
 
-      assert_equal 3, decoded.size
+      # Trailing skips are optimized away per protocol spec
+      assert_equal 2, decoded.size
       assert decoded.ranges[0].fingerprint?
       assert decoded.ranges[1].fingerprint?
-      assert decoded.ranges[2].skip?
     end
 
     test "to_hex and from_hex roundtrip" do
