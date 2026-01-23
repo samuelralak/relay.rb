@@ -3,13 +3,13 @@
 module RelaySync
   # Publishes events to remote relays with rate limiting and error handling
   class EventPublisher
-    attr_reader :connection, :pending_oks, :results
+    attr_reader :connection
 
     def initialize(connection)
       @connection = connection
-      @pending_oks = {}
-      @results = {}
       @mutex = Mutex.new
+      @condition = ConditionVariable.new
+      @results = {}
     end
 
     # Publish a single event and wait for OK response
@@ -20,9 +20,12 @@ module RelaySync
       event_data = event.is_a?(Event) ? event.raw_event : event
       event_id = event_data["id"] || event_data[:id]
 
-      # Register pending OK
-      @mutex.synchronize do
-        @pending_oks[event_id] = { event: event_data, time: Time.current }
+      # Register OK handler with Manager
+      RelaySync.manager.register_ok_handler(event_id) do |success, message|
+        @mutex.synchronize do
+          @results[event_id] = { success: success, message: message }
+          @condition.broadcast
+        end
       end
 
       # Send the event
@@ -30,6 +33,9 @@ module RelaySync
 
       # Wait for OK response
       wait_for_ok(event_id, timeout)
+    ensure
+      # Clean up handler if still registered
+      RelaySync.manager.unregister_ok_handler(event_id)
     end
 
     # Publish multiple events in batches
@@ -74,32 +80,21 @@ module RelaySync
       { published: published, failed: failed, duplicates: duplicates }
     end
 
-    # Handle incoming OK response
-    # @param event_id [String] event ID
-    # @param success [Boolean] whether relay accepted the event
-    # @param message [String] optional message from relay
-    def handle_ok(event_id, success, message)
-      @mutex.synchronize do
-        if @pending_oks.key?(event_id)
-          @results[event_id] = { success: success, message: message, time: Time.current }
-          @pending_oks.delete(event_id)
-        end
-      end
-    end
-
     private
 
     def wait_for_ok(event_id, timeout)
       deadline = Time.current + timeout
 
-      loop do
-        @mutex.synchronize do
+      @mutex.synchronize do
+        loop do
           return @results.delete(event_id) if @results.key?(event_id)
+
+          remaining = deadline - Time.current
+          return { success: false, message: "timeout" } if remaining <= 0
+
+          # Wait with timeout using ConditionVariable
+          @condition.wait(@mutex, remaining)
         end
-
-        return { success: false, message: "timeout" } if Time.current > deadline
-
-        sleep 0.05
       end
     end
 

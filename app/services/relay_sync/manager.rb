@@ -11,14 +11,75 @@ module RelaySync
 
     def initialize
       @connections = {}
+      @ok_handlers = {}   # event_id => callback
+      @neg_handlers = {}  # subscription_id => { reconciler:, callback: }
+      @eose_handlers = {} # subscription_id => callback
       @mutex = Mutex.new
     end
 
+    # Register a handler for OK response
+    # @param event_id [String] event ID to wait for
+    # @param handler [Proc] callback receiving (success, message)
+    def register_ok_handler(event_id, &handler)
+      @mutex.synchronize do
+        @ok_handlers[event_id] = handler
+      end
+    end
+
+    # Unregister OK handler
+    def unregister_ok_handler(event_id)
+      @mutex.synchronize do
+        @ok_handlers.delete(event_id)
+      end
+    end
+
+    # Register a Negentropy session handler
+    # @param subscription_id [String] NEG subscription ID
+    # @param reconciler [Negentropy::ClientReconciler] reconciler instance
+    # @param callback [Proc] callback receiving (have_ids, need_ids, complete)
+    def register_neg_handler(subscription_id, reconciler:, &callback)
+      @mutex.synchronize do
+        @neg_handlers[subscription_id] = { reconciler: reconciler, callback: callback }
+      end
+    end
+
+    # Unregister Negentropy handler
+    def unregister_neg_handler(subscription_id)
+      @mutex.synchronize do
+        @neg_handlers.delete(subscription_id)
+      end
+    end
+
+    # Register a handler for EOSE response
+    # @param subscription_id [String] subscription ID to wait for
+    # @param handler [Proc] callback called when EOSE received
+    def register_eose_handler(subscription_id, &handler)
+      @mutex.synchronize do
+        @eose_handlers[subscription_id] = handler
+      end
+    end
+
+    # Unregister EOSE handler
+    def unregister_eose_handler(subscription_id)
+      @mutex.synchronize do
+        @eose_handlers.delete(subscription_id)
+      end
+    end
+
     # Start the sync manager and connect to all enabled relays
+    # Respects max_concurrent_connections config limit
     def start
       Rails.logger.info "[RelaySync::Manager] Starting sync manager"
 
-      RelaySync.configuration.enabled_relays.each do |relay_config|
+      max_connections = RelaySync.configuration.sync_settings.max_concurrent_connections
+      relays_to_connect = RelaySync.configuration.enabled_relays.take(max_connections)
+
+      if relays_to_connect.size < RelaySync.configuration.enabled_relays.size
+        Rails.logger.warn "[RelaySync::Manager] Limited to #{max_connections} connections " \
+                          "(#{RelaySync.configuration.enabled_relays.size} relays configured)"
+      end
+
+      relays_to_connect.each do |relay_config|
         add_connection(relay_config)
       end
     end
@@ -77,7 +138,7 @@ module RelaySync
 
     # Upload events to a relay
     # @param relay_url [String] relay URL
-    # @param events [Array<Event>] events to upload (optional, defaults to all new events)
+    # @param events [Array<Event>] Event records to upload (optional, defaults to all new events)
     def upload_events(relay_url, events: nil)
       connection = connection_for(relay_url)
       return unless connection&.connected?
@@ -86,7 +147,7 @@ module RelaySync
 
       UploadEventsJob.perform_later(
         relay_url: relay_url,
-        event_ids: events&.map(&:id)
+        record_ids: events&.map(&:id)
       )
     end
 
@@ -157,6 +218,8 @@ module RelaySync
         on_eose: ->(conn, sub_id) { handle_eose(conn, sub_id) },
         on_ok: ->(conn, event_id, success, message) { handle_ok(conn, event_id, success, message) },
         on_error: ->(conn, message) { handle_error(conn, message) },
+        on_auth: ->(conn, challenge) { handle_auth(conn, challenge) },
+        on_closed: ->(conn, sub_id, message) { handle_closed(conn, sub_id, message) },
         on_neg_msg: ->(conn, sub_id, message) { handle_neg_msg(conn, sub_id, message) },
         on_neg_err: ->(conn, sub_id, error) { handle_neg_err(conn, sub_id, error) }
       }
@@ -171,7 +234,10 @@ module RelaySync
     end
 
     def find_or_create_sync_state(relay_url, filter, direction)
-      filter_hash = Digest::SHA256.hexdigest(filter.to_json)[0, 16]
+      # Exclude :since and :until from hash to prevent SyncState duplication
+      # when the same filter is used with different time windows
+      stable_filter = filter.symbolize_keys.except(:since, :until)
+      filter_hash = Digest::SHA256.hexdigest(stable_filter.to_json)[0, 16]
 
       SyncState.find_or_create_by!(relay_url: relay_url, filter_hash: filter_hash) do |state|
         state.direction = direction
@@ -194,23 +260,69 @@ module RelaySync
 
     def handle_eose(connection, subscription_id)
       Rails.logger.debug "[RelaySync::Manager] EOSE for #{subscription_id} from #{connection.url}"
+
+      handler = @mutex.synchronize { @eose_handlers.delete(subscription_id) }
+      handler&.call
     end
 
     def handle_ok(connection, event_id, success, message)
       Rails.logger.debug "[RelaySync::Manager] OK for #{event_id}: #{success} - #{message}"
+
+      handler = @mutex.synchronize { @ok_handlers.delete(event_id) }
+      handler&.call(success, message)
     end
 
     def handle_error(connection, message)
       Rails.logger.error "[RelaySync::Manager] Error from #{connection.url}: #{message}"
     end
 
+    def handle_auth(connection, challenge)
+      # NIP-42 authentication challenge received
+      # Currently just logs - full implementation requires signing capability
+      Rails.logger.warn "[RelaySync::Manager] AUTH challenge from #{connection.url} - authentication not implemented"
+    end
+
+    def handle_closed(connection, subscription_id, message)
+      Rails.logger.info "[RelaySync::Manager] CLOSED for #{subscription_id} from #{connection.url}: #{message}"
+      # Subscription was closed by the relay - clean up any pending handlers
+      unregister_neg_handler(subscription_id)
+    end
+
     def handle_neg_msg(connection, subscription_id, message)
-      # Negentropy messages are handled by the sync job
       Rails.logger.debug "[RelaySync::Manager] NEG-MSG for #{subscription_id} from #{connection.url}"
+
+      handler_info = @mutex.synchronize { @neg_handlers[subscription_id] }
+      return unless handler_info
+
+      reconciler = handler_info[:reconciler]
+      callback = handler_info[:callback]
+
+      begin
+        response_hex, have_ids, need_ids = reconciler.reconcile(message)
+
+        # Notify callback of found IDs
+        callback&.call(have_ids, need_ids, response_hex.nil?)
+
+        if response_hex
+          # Continue reconciliation
+          connection.neg_msg(subscription_id, response_hex)
+        else
+          # Reconciliation complete
+          connection.neg_close(subscription_id)
+          unregister_neg_handler(subscription_id)
+        end
+      rescue StandardError => e
+        Rails.logger.error "[RelaySync::Manager] NEG-MSG processing error: #{e.message}"
+        connection.neg_close(subscription_id)
+        unregister_neg_handler(subscription_id)
+      end
     end
 
     def handle_neg_err(connection, subscription_id, error)
       Rails.logger.error "[RelaySync::Manager] NEG-ERR for #{subscription_id} from #{connection.url}: #{error}"
+
+      # Clean up the handler
+      unregister_neg_handler(subscription_id)
     end
   end
 end
