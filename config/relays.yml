@@ -1,0 +1,48 @@
+# Upstream relay configuration for syncing events
+# Each relay can be configured for download (down), upload (up), or bidirectional (both) sync
+
+default: &default
+  upstream_relays:
+    - url: wss://relay.damus.io
+      enabled: true
+      backfill: true
+      negentropy: true
+      direction: down
+    - url: wss://nos.lol
+      enabled: true
+      backfill: true
+      negentropy: true
+      direction: down
+    - url: wss://relay.nostr.band
+      enabled: true
+      backfill: false
+      negentropy: false
+      direction: down
+
+  sync:
+    batch_size: 100
+    max_concurrent_connections: 10
+    reconnect_delay_seconds: 5
+    max_reconnect_attempts: 10
+    backfill_since_hours: 168
+    event_kinds:
+      - 0      # metadata
+      - 1      # text note
+      - 3      # contacts
+      - 5      # deletion
+      - 6      # repost
+      - 7      # reaction
+      - 30023  # long-form content
+    negentropy_frame_size: 60000
+    upload_batch_size: 50
+    upload_delay_ms: 100
+
+development:
+  <<: *default
+
+test:
+  <<: *default
+  upstream_relays: []
+
+production:
+  <<: *default
