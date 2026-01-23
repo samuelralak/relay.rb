@@ -91,12 +91,15 @@ module Negentropy
       @items[start_idx...end_idx]
     end
 
-    # Count items in range
+    # Count items in range using indices (avoids array allocation)
     # @param lower [Bound] lower bound
     # @param upper [Bound] upper bound
     # @return [Integer] count
     def count_in_range(lower, upper)
-      range(lower, upper).size
+      raise "Storage must be sealed" unless @sealed
+
+      start_idx, end_idx = range_indices(lower, upper)
+      end_idx - start_idx
     end
 
     # Compute fingerprint for items in range
@@ -104,8 +107,11 @@ module Negentropy
     # @param upper [Bound] upper bound
     # @return [String] 16-byte fingerprint
     def fingerprint(lower, upper)
-      items_in_range = range(lower, upper)
-      ids = items_in_range.map(&:id)
+      raise "Storage must be sealed" unless @sealed
+
+      start_idx, end_idx = range_indices(lower, upper)
+      # Collect IDs without creating intermediate array
+      ids = (start_idx...end_idx).map { |i| @items[i].id }
       Fingerprint.compute(ids)
     end
 
@@ -117,16 +123,31 @@ module Negentropy
       range(lower, upper).map { |item| item.id.unpack1("H*") }
     end
 
-    # Split a range at the midpoint
+    # Split a range at the midpoint using indices (avoids array allocation)
     # @param lower [Bound] lower bound
     # @param upper [Bound] upper bound
     # @return [Bound] midpoint bound
     def midpoint(lower, upper)
-      items_in_range = range(lower, upper)
-      return lower if items_in_range.empty?
+      raise "Storage must be sealed" unless @sealed
 
-      mid_idx = items_in_range.size / 2
-      items_in_range[mid_idx].bound
+      start_idx, end_idx = range_indices(lower, upper)
+      count = end_idx - start_idx
+      return lower if count.zero?
+
+      mid_idx = start_idx + (count / 2)
+      @items[mid_idx].bound
+    end
+
+    private
+
+    # Get start and end indices for a range (used by optimized methods)
+    # @return [Array<Integer, Integer>] [start_idx, end_idx]
+    def range_indices(lower, upper)
+      start_idx = find_lower_bound(lower)
+      return [start_idx, start_idx] if start_idx >= @items.size
+
+      end_idx = find_lower_bound(upper)
+      [start_idx, end_idx]
     end
 
     # Create from ActiveRecord scope
