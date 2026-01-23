@@ -5,8 +5,8 @@ class UploadEventsJob < ApplicationJob
   queue_as :low_priority
 
   # @param relay_url [String] URL of the relay to upload to
-  # @param event_ids [Array<String>, nil] specific event IDs to upload (nil = all new events)
-  def perform(relay_url:, event_ids: nil)
+  # @param record_ids [Array<Integer>, nil] database record IDs to upload (nil = all new events)
+  def perform(relay_url:, record_ids: nil)
     @relay_url = relay_url
     @sync_state = find_or_create_sync_state
 
@@ -17,7 +17,7 @@ class UploadEventsJob < ApplicationJob
       return
     end
 
-    events = load_events(event_ids)
+    events = load_events(record_ids)
 
     if events.empty?
       Rails.logger.info "[UploadEventsJob] No events to upload to #{relay_url}"
@@ -44,9 +44,9 @@ class UploadEventsJob < ApplicationJob
     end
   end
 
-  def load_events(event_ids)
-    if event_ids.present?
-      Event.where(id: event_ids).active.newest_first
+  def load_events(record_ids)
+    if record_ids.present?
+      Event.where(id: record_ids).active.newest_first
     else
       @sync_state.events_to_upload.limit(1000)
     end
