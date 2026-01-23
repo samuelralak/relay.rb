@@ -52,3 +52,7 @@ end
 gem "dotenv-rails", "~> 3.2"
 
 gem "paranoia", "~> 3.1"
+
+# WebSocket client for connecting to Nostr relays
+gem "faye-websocket", "~> 0.12"
+gem "eventmachine", "~> 1.2"
