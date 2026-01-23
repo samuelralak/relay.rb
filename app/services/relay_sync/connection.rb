@@ -4,6 +4,53 @@ require "faye/websocket"
 require "eventmachine"
 
 module RelaySync
+  # Shared EventMachine reactor for all connections
+  class Reactor
+    include Singleton
+
+    def initialize
+      @mutex = Mutex.new
+      @running = false
+      @thread = nil
+    end
+
+    def start
+      @mutex.synchronize do
+        return if @running
+
+        @running = true
+        @thread = Thread.new do
+          EM.run do
+            # Reactor is now running
+          end
+        end
+
+        # Wait for reactor to start
+        sleep 0.1 until EM.reactor_running?
+      end
+    end
+
+    def stop
+      @mutex.synchronize do
+        return unless @running
+
+        EM.stop_event_loop if EM.reactor_running?
+        @thread&.join(5)
+        @running = false
+        @thread = nil
+      end
+    end
+
+    def running?
+      @running && EM.reactor_running?
+    end
+
+    def schedule(&block)
+      start unless running?
+      EM.next_tick(&block)
+    end
+  end
+
   # WebSocket connection wrapper for connecting to Nostr relays
   # Handles connection lifecycle, reconnection, and message routing
   class Connection
@@ -19,7 +66,6 @@ module RelaySync
       @reconnect_attempts = 0
       @mutex = Mutex.new
       @ws = nil
-      @em_thread = nil
     end
 
     # Connect to the relay
@@ -35,7 +81,7 @@ module RelaySync
       return if state == :disconnected
 
       @state = :closing
-      @mutex.synchronize do
+      Reactor.instance.schedule do
         @ws&.close
       end
     end
@@ -95,10 +141,8 @@ module RelaySync
     private
 
     def start_connection
-      @em_thread = Thread.new do
-        EM.run do
-          setup_websocket
-        end
+      Reactor.instance.schedule do
+        setup_websocket
       end
     end
 
@@ -167,6 +211,10 @@ module RelaySync
         handle_ok(message[1], message[2], message[3])
       when "NOTICE"
         handle_notice(message[1])
+      when "AUTH"
+        handle_auth(message[1])
+      when "CLOSED"
+        handle_closed(message[1], message[2])
       when "NEG-MSG"
         handle_neg_msg(message[1], message[2])
       when "NEG-ERR"
@@ -191,6 +239,17 @@ module RelaySync
     def handle_notice(message)
       Rails.logger.info "[RelaySync] NOTICE from #{url}: #{message}"
       @callbacks[:on_notice]&.call(self, message)
+    end
+
+    def handle_auth(challenge)
+      Rails.logger.info "[RelaySync] AUTH challenge from #{url}"
+      @callbacks[:on_auth]&.call(self, challenge)
+    end
+
+    def handle_closed(subscription_id, message)
+      Rails.logger.info "[RelaySync] CLOSED for #{subscription_id} from #{url}: #{message}"
+      @subscriptions.delete(subscription_id)
+      @callbacks[:on_closed]&.call(self, subscription_id, message)
     end
 
     def handle_neg_msg(subscription_id, message)
@@ -226,8 +285,9 @@ module RelaySync
     def send_message(message)
       return unless connected?
 
-      @mutex.synchronize do
-        @ws&.send(message.to_json)
+      json = message.to_json
+      Reactor.instance.schedule do
+        @ws&.send(json)
       end
     end
   end
