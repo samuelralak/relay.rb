@@ -65,6 +65,7 @@ module Negentropy
     end
 
     # Encode message to binary
+    # Trailing SKIPs are omitted per protocol spec
     # @return [String] binary message
     def encode
       result = "".b
@@ -72,7 +73,11 @@ module Negentropy
 
       prev_timestamp = 0
 
-      @ranges.each do |range|
+      # Find last non-skip range to optimize away trailing skips
+      ranges_to_encode = @ranges.dup
+      ranges_to_encode.pop while ranges_to_encode.last&.skip?
+
+      ranges_to_encode.each do |range|
         # Encode upper bound with delta timestamp
         result << range.upper_bound.encode(prev_timestamp)
         prev_timestamp = range.upper_bound.timestamp unless range.upper_bound.infinity?

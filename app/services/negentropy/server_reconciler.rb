@@ -15,7 +15,13 @@ module Negentropy
 
       lower = Bound.min
 
-      request.ranges.each do |range|
+      # Handle empty message as implicit "skip to end" (client has nothing)
+      ranges = request.ranges
+      if ranges.empty?
+        ranges = [Message::Range.new(upper_bound: Bound.max, mode: Message::Mode::SKIP, payload: nil)]
+      end
+
+      ranges.each do |range|
         upper = range.upper_bound
 
         case range.mode
