@@ -1,0 +1,250 @@
+# frozen_string_literal: true
+
+require "test_helper"
+
+module Sync
+  class OrchestratorTest < ActiveSupport::TestCase
+    include ActiveJob::TestHelper
+
+    # =========================================================================
+    # Test Helpers
+    # =========================================================================
+
+    setup do
+      # Clear any existing sync states
+      SyncState.delete_all
+
+      # Store original configuration
+      @original_config = RelaySync.instance_variable_get(:@configuration)
+
+      # Create fake relay configurations
+      @negentropy_relay = create_fake_relay(
+        url: "wss://negentropy.relay.com",
+        negentropy: true,
+        backfill: true,
+        direction: "down"
+      )
+      @polling_relay = create_fake_relay(
+        url: "wss://polling.relay.com",
+        negentropy: false,
+        backfill: true,
+        direction: "down"
+      )
+      @upload_relay = create_fake_relay(
+        url: "wss://upload.relay.com",
+        negentropy: false,
+        backfill: false,
+        direction: "up"
+      )
+    end
+
+    teardown do
+      # Restore original configuration
+      RelaySync.instance_variable_set(:@configuration, @original_config)
+    end
+
+    def create_fake_relay(url:, negentropy: false, backfill: false, direction: "down")
+      relay = Object.new
+      relay.define_singleton_method(:url) { url }
+      relay.define_singleton_method(:negentropy?) { negentropy }
+      relay.define_singleton_method(:backfill?) { backfill }
+      relay.define_singleton_method(:direction) { direction }
+      relay.define_singleton_method(:enabled?) { true }
+      relay.define_singleton_method(:upload_enabled?) { direction == "up" || direction == "both" }
+      relay
+    end
+
+    def with_fake_configuration(backfill: [], download: [], upload: [])
+      fake_config = Object.new
+      fake_config.define_singleton_method(:backfill_relays) { backfill }
+      fake_config.define_singleton_method(:download_relays) { download }
+      fake_config.define_singleton_method(:upload_relays) { upload }
+      fake_config.define_singleton_method(:find_relay) { |url| (backfill + download + upload).find { |r| r.url == url } }
+      fake_config.define_singleton_method(:sync_settings) { @original_config&.sync_settings || RelaySync::Configuration.new.sync_settings }
+
+      RelaySync.instance_variable_set(:@configuration, fake_config)
+      yield
+    end
+
+    # =========================================================================
+    # Backfill Mode
+    # =========================================================================
+
+    test "backfill mode dispatches NegentropySyncJob for negentropy-capable relays" do
+      with_fake_configuration(backfill: [@negentropy_relay]) do
+        assert_enqueued_with(job: NegentropySyncJob) do
+          result = Orchestrator.call(mode: "backfill")
+          assert_equal 1, result[:dispatched]
+        end
+      end
+    end
+
+    test "backfill mode dispatches PollingSyncJob for non-negentropy relays" do
+      with_fake_configuration(backfill: [@polling_relay]) do
+        assert_enqueued_with(job: PollingSyncJob) do
+          result = Orchestrator.call(mode: "backfill")
+          assert_equal 1, result[:dispatched]
+        end
+      end
+    end
+
+    test "backfill mode job has correct relay_url" do
+      with_fake_configuration(backfill: [@negentropy_relay]) do
+        Orchestrator.call(mode: "backfill")
+
+        enqueued_job = enqueued_jobs.find { |j| j["job_class"] == "NegentropySyncJob" }
+        assert_not_nil enqueued_job
+        args = enqueued_job["arguments"].first
+        assert_equal "wss://negentropy.relay.com", args["relay_url"]
+      end
+    end
+
+    # =========================================================================
+    # Realtime Mode
+    # =========================================================================
+
+    test "realtime mode dispatches PollingSyncJob" do
+      with_fake_configuration(download: [@polling_relay]) do
+        assert_enqueued_with(job: PollingSyncJob) do
+          result = Orchestrator.call(mode: "realtime")
+          assert_equal 1, result[:dispatched]
+        end
+      end
+    end
+
+    test "realtime mode job has realtime mode and since filter" do
+      with_fake_configuration(download: [@polling_relay]) do
+        Orchestrator.call(mode: "realtime")
+
+        enqueued_job = enqueued_jobs.find { |j| j["job_class"] == "PollingSyncJob" }
+        assert_not_nil enqueued_job
+        args = enqueued_job["arguments"].first
+        assert_equal "realtime", args["mode"]
+        assert args["filter"]["since"].present?
+      end
+    end
+
+    # =========================================================================
+    # Upload Mode
+    # =========================================================================
+
+    test "upload mode dispatches UploadSyncJob for upload relays" do
+      with_fake_configuration(upload: [@upload_relay]) do
+        assert_enqueued_with(job: UploadSyncJob) do
+          result = Orchestrator.call(mode: "upload")
+          assert_equal 1, result[:dispatched]
+        end
+      end
+    end
+
+    test "upload mode job has correct relay_url" do
+      with_fake_configuration(upload: [@upload_relay]) do
+        Orchestrator.call(mode: "upload")
+
+        enqueued_job = enqueued_jobs.find { |j| j["job_class"] == "UploadSyncJob" }
+        assert_not_nil enqueued_job
+        args = enqueued_job["arguments"].first
+        assert_equal "wss://upload.relay.com", args["relay_url"]
+      end
+    end
+
+    # =========================================================================
+    # Skip Already Syncing
+    # =========================================================================
+
+    test "skips relay that is already syncing" do
+      # Create an active sync state
+      filter_hash = SyncState.compute_filter_hash(direction: "down", filter: {})
+      SyncState.create!(
+        relay_url: @negentropy_relay.url,
+        filter_hash: filter_hash,
+        direction: "down",
+        status: "syncing",
+        events_downloaded: 0,
+        events_uploaded: 0
+      )
+
+      with_fake_configuration(backfill: [@negentropy_relay]) do
+        assert_no_enqueued_jobs only: NegentropySyncJob do
+          result = Orchestrator.call(mode: "backfill")
+          assert_equal 0, result[:dispatched]
+        end
+      end
+    end
+
+    test "dispatches job for stale syncing state" do
+      filter_hash = SyncState.compute_filter_hash(direction: "down", filter: {})
+      SyncState.create!(
+        relay_url: @negentropy_relay.url,
+        filter_hash: filter_hash,
+        direction: "down",
+        status: "syncing",
+        updated_at: 1.hour.ago, # Stale
+        events_downloaded: 0,
+        events_uploaded: 0
+      )
+
+      with_fake_configuration(backfill: [@negentropy_relay]) do
+        assert_enqueued_with(job: NegentropySyncJob) do
+          result = Orchestrator.call(mode: "backfill")
+          assert_equal 1, result[:dispatched]
+        end
+      end
+    end
+
+    # =========================================================================
+    # Skip Completed Backfill
+    # =========================================================================
+
+    test "skips relay with completed backfill" do
+      filter_hash = SyncState.compute_filter_hash(direction: "down", filter: {})
+      SyncState.create!(
+        relay_url: @negentropy_relay.url,
+        filter_hash: filter_hash,
+        direction: "down",
+        status: "completed",
+        backfill_target: 1.week.ago,
+        backfill_until: 2.weeks.ago, # Past target = complete
+        events_downloaded: 1000,
+        events_uploaded: 0
+      )
+
+      with_fake_configuration(backfill: [@negentropy_relay]) do
+        assert_no_enqueued_jobs only: NegentropySyncJob do
+          result = Orchestrator.call(mode: "backfill")
+          assert_equal 0, result[:dispatched]
+        end
+      end
+    end
+
+    # =========================================================================
+    # Single Relay Mode
+    # =========================================================================
+
+    test "dispatches job for specific relay when relay_url provided" do
+      with_fake_configuration(backfill: [@negentropy_relay, @polling_relay]) do
+        Orchestrator.call(mode: "backfill", relay_url: @negentropy_relay.url)
+
+        # Should only enqueue job for the specified relay
+        negentropy_jobs = enqueued_jobs.select { |j| j["job_class"] == "NegentropySyncJob" }
+        polling_jobs = enqueued_jobs.select { |j| j["job_class"] == "PollingSyncJob" }
+
+        assert_equal 1, negentropy_jobs.size
+        assert_equal 0, polling_jobs.size
+      end
+    end
+
+    # =========================================================================
+    # Return Value
+    # =========================================================================
+
+    test "returns dispatched count and mode" do
+      with_fake_configuration(backfill: [@negentropy_relay, @polling_relay]) do
+        result = Orchestrator.call(mode: "backfill")
+
+        assert_equal 2, result[:dispatched]
+        assert_equal "backfill", result[:mode]
+      end
+    end
+  end
+end
