@@ -184,7 +184,7 @@ module RelaySync
       assert_equal 5, settings.reconnect_delay_seconds
       assert_equal 10, settings.max_reconnect_attempts
       assert_equal 168, settings.backfill_since_hours
-      assert_equal [0, 1, 3, 5, 6, 7], settings.event_kinds
+      assert_equal [ 0, 1, 3, 5, 6, 7 ], settings.event_kinds
       assert_equal 60_000, settings.negentropy_frame_size
       assert_equal 50, settings.upload_batch_size
       assert_equal 100, settings.upload_delay_ms
@@ -197,7 +197,7 @@ module RelaySync
         reconnect_delay_seconds: 10,
         max_reconnect_attempts: 20,
         backfill_since_hours: 24,
-        event_kinds: [1, 30023],
+        event_kinds: [ 1, 30023 ],
         negentropy_frame_size: 30_000,
         upload_batch_size: 25,
         upload_delay_ms: 200
@@ -208,16 +208,16 @@ module RelaySync
       assert_equal 10, settings.reconnect_delay_seconds
       assert_equal 20, settings.max_reconnect_attempts
       assert_equal 24, settings.backfill_since_hours
-      assert_equal [1, 30023], settings.event_kinds
+      assert_equal [ 1, 30023 ], settings.event_kinds
       assert_equal 30_000, settings.negentropy_frame_size
       assert_equal 25, settings.upload_batch_size
       assert_equal 200, settings.upload_delay_ms
     end
 
-    test "backfill_since returns duration" do
+    test "backfill_since returns duration in seconds" do
       settings = Configuration::SyncSettings.new(backfill_since_hours: 24)
 
-      assert_equal 24.hours, settings.backfill_since
+      assert_equal 24 * 3600, settings.backfill_since
     end
 
     test "upload_delay returns seconds as float" do

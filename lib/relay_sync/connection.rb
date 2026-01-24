@@ -1,62 +1,24 @@
 # frozen_string_literal: true
 
 require "faye/websocket"
-require "eventmachine"
+require "json"
+require "logger"
 
 module RelaySync
-  # Shared EventMachine reactor for all connections
-  class Reactor
-    include Singleton
-
-    def initialize
-      @mutex = Mutex.new
-      @running = false
-      @thread = nil
-    end
-
-    def start
-      @mutex.synchronize do
-        return if @running
-
-        @running = true
-        @thread = Thread.new do
-          EM.run do
-            # Reactor is now running
-          end
-        end
-
-        # Wait for reactor to start
-        sleep 0.1 until EM.reactor_running?
-      end
-    end
-
-    def stop
-      @mutex.synchronize do
-        return unless @running
-
-        EM.stop_event_loop if EM.reactor_running?
-        @thread&.join(5)
-        @running = false
-        @thread = nil
-      end
-    end
-
-    def running?
-      @running && EM.reactor_running?
-    end
-
-    def schedule(&block)
-      start unless running?
-      EM.next_tick(&block)
-    end
-  end
-
   # WebSocket connection wrapper for connecting to Nostr relays
   # Handles connection lifecycle, reconnection, and message routing
   class Connection
     STATES = %i[disconnected connecting connected closing].freeze
 
     attr_reader :url, :state, :subscriptions, :reconnect_attempts
+
+    class << self
+      attr_writer :logger
+
+      def logger
+        @logger ||= RelaySync.logger
+      end
+    end
 
     def initialize(url:, callbacks: {})
       @url = url
@@ -91,7 +53,7 @@ module RelaySync
     # @param filters [Array<Hash>] Nostr filter objects
     def subscribe(subscription_id, filters)
       @subscriptions[subscription_id] = filters
-      send_message(["REQ", subscription_id, *filters]) if connected?
+      send_message([ "REQ", subscription_id, *filters ]) if connected?
     end
 
     # Unsubscribe from a subscription
@@ -99,14 +61,14 @@ module RelaySync
     def unsubscribe(subscription_id)
       return unless @subscriptions.key?(subscription_id)
 
-      send_message(["CLOSE", subscription_id]) if connected?
+      send_message([ "CLOSE", subscription_id ]) if connected?
       @subscriptions.delete(subscription_id)
     end
 
     # Send an event to the relay
     # @param event [Hash] Nostr event object
     def publish_event(event)
-      send_message(["EVENT", event])
+      send_message([ "EVENT", event ])
     end
 
     # Send Negentropy NEG-OPEN message
@@ -114,20 +76,20 @@ module RelaySync
     # @param filter [Hash] Nostr filter
     # @param initial_message [String] hex-encoded initial negentropy message
     def neg_open(subscription_id, filter, initial_message)
-      send_message(["NEG-OPEN", subscription_id, filter, initial_message])
+      send_message([ "NEG-OPEN", subscription_id, filter, initial_message ])
     end
 
     # Send Negentropy NEG-MSG message
     # @param subscription_id [String] subscription ID
     # @param message [String] hex-encoded negentropy message
     def neg_msg(subscription_id, message)
-      send_message(["NEG-MSG", subscription_id, message])
+      send_message([ "NEG-MSG", subscription_id, message ])
     end
 
     # Send Negentropy NEG-CLOSE message
     # @param subscription_id [String] subscription ID
     def neg_close(subscription_id)
-      send_message(["NEG-CLOSE", subscription_id])
+      send_message([ "NEG-CLOSE", subscription_id ])
     end
 
     def connected?
@@ -139,6 +101,10 @@ module RelaySync
     end
 
     private
+
+    def logger
+      self.class.logger
+    end
 
     def start_connection
       Reactor.instance.schedule do
@@ -170,7 +136,7 @@ module RelaySync
       @state = :connected
       @reconnect_attempts = 0
 
-      Rails.logger.info "[RelaySync] Connected to #{url}"
+      logger.info "[RelaySync] Connected to #{url}"
       @callbacks[:on_connect]&.call(self)
 
       # Resubscribe to all existing subscriptions
@@ -181,21 +147,21 @@ module RelaySync
       message = JSON.parse(data)
       route_message(message)
     rescue JSON::ParserError => e
-      Rails.logger.error "[RelaySync] Invalid JSON from #{url}: #{e.message}"
+      logger.error "[RelaySync] Invalid JSON from #{url}: #{e.message}"
     end
 
     def handle_close(event)
       was_connected = state == :connected
       @state = :disconnected
 
-      Rails.logger.info "[RelaySync] Disconnected from #{url}: code=#{event.code}"
+      logger.info "[RelaySync] Disconnected from #{url}: code=#{event.code}"
       @callbacks[:on_disconnect]&.call(self, event.code, event.reason)
 
       schedule_reconnect if was_connected && @state != :closing
     end
 
     def handle_error(event)
-      Rails.logger.error "[RelaySync] Error from #{url}: #{event.message}"
+      logger.error "[RelaySync] Error from #{url}: #{event.message}"
       @callbacks[:on_error]&.call(self, event.message)
     end
 
@@ -220,7 +186,7 @@ module RelaySync
       when "NEG-ERR"
         handle_neg_err(message[1], message[2])
       else
-        Rails.logger.warn "[RelaySync] Unknown message type from #{url}: #{type}"
+        logger.warn "[RelaySync] Unknown message type from #{url}: #{type}"
       end
     end
 
@@ -237,17 +203,17 @@ module RelaySync
     end
 
     def handle_notice(message)
-      Rails.logger.info "[RelaySync] NOTICE from #{url}: #{message}"
+      logger.info "[RelaySync] NOTICE from #{url}: #{message}"
       @callbacks[:on_notice]&.call(self, message)
     end
 
     def handle_auth(challenge)
-      Rails.logger.info "[RelaySync] AUTH challenge from #{url}"
+      logger.info "[RelaySync] AUTH challenge from #{url}"
       @callbacks[:on_auth]&.call(self, challenge)
     end
 
     def handle_closed(subscription_id, message)
-      Rails.logger.info "[RelaySync] CLOSED for #{subscription_id} from #{url}: #{message}"
+      logger.info "[RelaySync] CLOSED for #{subscription_id} from #{url}: #{message}"
       @subscriptions.delete(subscription_id)
       @callbacks[:on_closed]&.call(self, subscription_id, message)
     end
@@ -257,13 +223,13 @@ module RelaySync
     end
 
     def handle_neg_err(subscription_id, error)
-      Rails.logger.error "[RelaySync] NEG-ERR from #{url}: #{error}"
+      logger.error "[RelaySync] NEG-ERR from #{url}: #{error}"
       @callbacks[:on_neg_err]&.call(self, subscription_id, error)
     end
 
     def resubscribe_all
       @subscriptions.each do |sub_id, filters|
-        send_message(["REQ", sub_id, *filters])
+        send_message([ "REQ", sub_id, *filters ])
       end
     end
 
@@ -274,7 +240,7 @@ module RelaySync
       return if @reconnect_attempts > config.max_reconnect_attempts
 
       delay = config.reconnect_delay_seconds * @reconnect_attempts
-      Rails.logger.info "[RelaySync] Reconnecting to #{url} in #{delay}s (attempt #{@reconnect_attempts})"
+      logger.info "[RelaySync] Reconnecting to #{url} in #{delay}s (attempt #{@reconnect_attempts})"
 
       Thread.new do
         sleep delay

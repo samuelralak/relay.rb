@@ -1,30 +1,14 @@
 # frozen_string_literal: true
 
-# RelaySync module provides functionality for syncing events with upstream Nostr relays
-module RelaySync
-  class << self
-    def configuration
-      @configuration ||= Configuration.new
-    end
+# Configure RelaySync library for syncing events with upstream Nostr relays
+# The library is defined in lib/relay_sync.rb, this initializer only configures it
 
-    def configure
-      yield(configuration) if block_given?
-    end
+require_relative "../../lib/relay_sync"
 
-    def start
-      Manager.instance.start
-    end
-
-    def stop
-      Manager.instance.stop
-    end
-
-    def manager
-      Manager.instance
-    end
-
-    def status
-      Manager.instance.status
-    end
-  end
+RelaySync.configure do |config|
+  config.load_from_yaml(Rails.root.join("config/relays.yml"), Rails.env)
 end
+
+# Configure logging to use Rails logger
+RelaySync::Connection.logger = Rails.logger
+RelaySync::Manager.logger = Rails.logger

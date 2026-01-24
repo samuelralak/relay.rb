@@ -7,7 +7,7 @@ module RelaySync
     # Parsing tests
     test "parses EVENT message" do
       event = { "id" => "abc", "pubkey" => "xyz", "kind" => 1 }
-      raw = JSON.generate(["EVENT", "sub123", event])
+      raw = JSON.generate([ "EVENT", "sub123", event ])
 
       result = MessageHandler.parse(raw)
 
@@ -17,7 +17,7 @@ module RelaySync
     end
 
     test "parses EOSE message" do
-      raw = JSON.generate(["EOSE", "sub123"])
+      raw = JSON.generate([ "EOSE", "sub123" ])
 
       result = MessageHandler.parse(raw)
 
@@ -26,7 +26,7 @@ module RelaySync
     end
 
     test "parses OK message with success" do
-      raw = JSON.generate(["OK", "event_id_123", true, ""])
+      raw = JSON.generate([ "OK", "event_id_123", true, "" ])
 
       result = MessageHandler.parse(raw)
 
@@ -37,7 +37,7 @@ module RelaySync
     end
 
     test "parses OK message with failure" do
-      raw = JSON.generate(["OK", "event_id_123", false, "duplicate: already exists"])
+      raw = JSON.generate([ "OK", "event_id_123", false, "duplicate: already exists" ])
 
       result = MessageHandler.parse(raw)
 
@@ -48,7 +48,7 @@ module RelaySync
     end
 
     test "parses NOTICE message" do
-      raw = JSON.generate(["NOTICE", "Rate limited"])
+      raw = JSON.generate([ "NOTICE", "Rate limited" ])
 
       result = MessageHandler.parse(raw)
 
@@ -57,7 +57,7 @@ module RelaySync
     end
 
     test "parses NEG-MSG message" do
-      raw = JSON.generate(["NEG-MSG", "sub123", "abcd1234"])
+      raw = JSON.generate([ "NEG-MSG", "sub123", "abcd1234" ])
 
       result = MessageHandler.parse(raw)
 
@@ -67,7 +67,7 @@ module RelaySync
     end
 
     test "parses NEG-ERR message" do
-      raw = JSON.generate(["NEG-ERR", "sub123", "RESULTS_TOO_BIG"])
+      raw = JSON.generate([ "NEG-ERR", "sub123", "RESULTS_TOO_BIG" ])
 
       result = MessageHandler.parse(raw)
 
@@ -77,7 +77,7 @@ module RelaySync
     end
 
     test "parses CLOSED message" do
-      raw = JSON.generate(["CLOSED", "sub123", "subscription replaced"])
+      raw = JSON.generate([ "CLOSED", "sub123", "subscription replaced" ])
 
       result = MessageHandler.parse(raw)
 
@@ -87,7 +87,7 @@ module RelaySync
     end
 
     test "parses AUTH message" do
-      raw = JSON.generate(["AUTH", "challenge123"])
+      raw = JSON.generate([ "AUTH", "challenge123" ])
 
       result = MessageHandler.parse(raw)
 
@@ -96,12 +96,12 @@ module RelaySync
     end
 
     test "returns unknown for unrecognized message type" do
-      raw = JSON.generate(["UNKNOWN_TYPE", "data"])
+      raw = JSON.generate([ "UNKNOWN_TYPE", "data" ])
 
       result = MessageHandler.parse(raw)
 
       assert_equal :unknown, result[:type]
-      assert_equal ["UNKNOWN_TYPE", "data"], result[:raw]
+      assert_equal [ "UNKNOWN_TYPE", "data" ], result[:raw]
     end
 
     test "returns error for invalid JSON" do
@@ -113,42 +113,42 @@ module RelaySync
 
     # Message building tests
     test "build_req creates REQ message" do
-      filters = [{ kinds: [1] }, { authors: ["abc"] }]
+      filters = [ { kinds: [ 1 ] }, { authors: [ "abc" ] } ]
       result = MessageHandler.build_req("sub123", *filters)
 
-      assert_equal ["REQ", "sub123", { kinds: [1] }, { authors: ["abc"] }], result
+      assert_equal [ "REQ", "sub123", { kinds: [ 1 ] }, { authors: [ "abc" ] } ], result
     end
 
     test "build_close creates CLOSE message" do
       result = MessageHandler.build_close("sub123")
 
-      assert_equal ["CLOSE", "sub123"], result
+      assert_equal [ "CLOSE", "sub123" ], result
     end
 
     test "build_event creates EVENT message" do
       event = { id: "abc", pubkey: "xyz" }
       result = MessageHandler.build_event(event)
 
-      assert_equal ["EVENT", { id: "abc", pubkey: "xyz" }], result
+      assert_equal [ "EVENT", { id: "abc", pubkey: "xyz" } ], result
     end
 
     test "build_neg_open creates NEG-OPEN message" do
-      filter = { kinds: [1] }
+      filter = { kinds: [ 1 ] }
       result = MessageHandler.build_neg_open("sub123", filter, "initial_msg")
 
-      assert_equal ["NEG-OPEN", "sub123", { kinds: [1] }, "initial_msg"], result
+      assert_equal [ "NEG-OPEN", "sub123", { kinds: [ 1 ] }, "initial_msg" ], result
     end
 
     test "build_neg_msg creates NEG-MSG message" do
       result = MessageHandler.build_neg_msg("sub123", "response_msg")
 
-      assert_equal ["NEG-MSG", "sub123", "response_msg"], result
+      assert_equal [ "NEG-MSG", "sub123", "response_msg" ], result
     end
 
     test "build_neg_close creates NEG-CLOSE message" do
       result = MessageHandler.build_neg_close("sub123")
 
-      assert_equal ["NEG-CLOSE", "sub123"], result
+      assert_equal [ "NEG-CLOSE", "sub123" ], result
     end
 
     # Event validation tests

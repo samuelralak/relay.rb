@@ -1,0 +1,53 @@
+# frozen_string_literal: true
+
+require "singleton"
+require "eventmachine"
+
+module RelaySync
+  # Shared EventMachine reactor for all connections
+  class Reactor
+    include Singleton
+
+    def initialize
+      @mutex = Mutex.new
+      @running = false
+      @thread = nil
+    end
+
+    def start
+      @mutex.synchronize do
+        return if @running
+
+        @running = true
+        @thread = Thread.new do
+          EM.run do
+            # Reactor is now running
+          end
+        end
+
+        # Wait for reactor to start
+        sleep 0.1 until EM.reactor_running?
+      end
+    end
+
+    def stop
+      @mutex.synchronize do
+        return unless @running
+
+        EM.stop_event_loop if EM.reactor_running?
+        @thread&.join(5)
+        @running = false
+        @thread = nil
+      end
+    end
+
+    def running?
+      @running && EM.reactor_running?
+    end
+
+    def schedule(&block)
+      start unless running?
+      EM.next_tick(&block)
+    end
+  end
+end

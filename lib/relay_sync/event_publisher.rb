@@ -13,11 +13,11 @@ module RelaySync
     end
 
     # Publish a single event and wait for OK response
-    # @param event [Event, Hash] event to publish
+    # @param event [Hash, #raw_event] event to publish (Hash or object responding to raw_event)
     # @param timeout [Integer] timeout in seconds
     # @return [Hash] result with :success, :message
     def publish(event, timeout: 10)
-      event_data = event.is_a?(Event) ? event.raw_event : event
+      event_data = event.respond_to?(:raw_event) ? event.raw_event : event
       event_id = event_data["id"] || event_data[:id]
 
       # Register OK handler with Manager
@@ -39,10 +39,10 @@ module RelaySync
     end
 
     # Publish multiple events in batches
-    # @param events [Array<Event, Hash>] events to publish
+    # @param events [Array<Hash, #raw_event>] events to publish
     # @param batch_size [Integer] events per batch
     # @param delay [Float] delay between batches in seconds
-    # @yield [result] called for each published event
+    # @yield [event, result] called for each published event
     # @return [Hash] summary of results
     def publish_batch(events, batch_size: 50, delay: 0.1)
       published = 0
@@ -83,13 +83,13 @@ module RelaySync
     private
 
     def wait_for_ok(event_id, timeout)
-      deadline = Time.current + timeout
+      deadline = Time.now + timeout
 
       @mutex.synchronize do
         loop do
           return @results.delete(event_id) if @results.key?(event_id)
 
-          remaining = deadline - Time.current
+          remaining = deadline - Time.now
           return { success: false, message: "timeout" } if remaining <= 0
 
           # Wait with timeout using ConditionVariable

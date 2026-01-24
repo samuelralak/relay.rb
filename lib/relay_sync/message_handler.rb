@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require "json"
+
 module RelaySync
   # Handles parsing and validation of Nostr relay messages
   module MessageHandler
@@ -41,21 +43,21 @@ module RelaySync
     # @param filters [Array<Hash>] Nostr filter objects
     # @return [Array] REQ message array
     def build_req(subscription_id, *filters)
-      ["REQ", subscription_id, *filters]
+      [ "REQ", subscription_id, *filters ]
     end
 
     # Build a CLOSE message for unsubscribing
     # @param subscription_id [String] subscription ID
     # @return [Array] CLOSE message array
     def build_close(subscription_id)
-      ["CLOSE", subscription_id]
+      [ "CLOSE", subscription_id ]
     end
 
     # Build an EVENT message for publishing
     # @param event [Hash] Nostr event object
     # @return [Array] EVENT message array
     def build_event(event)
-      ["EVENT", event]
+      [ "EVENT", event ]
     end
 
     # Build a NEG-OPEN message for Negentropy sync
@@ -64,7 +66,7 @@ module RelaySync
     # @param initial_message [String] hex-encoded initial message
     # @return [Array] NEG-OPEN message array
     def build_neg_open(subscription_id, filter, initial_message)
-      ["NEG-OPEN", subscription_id, filter, initial_message]
+      [ "NEG-OPEN", subscription_id, filter, initial_message ]
     end
 
     # Build a NEG-MSG message for Negentropy sync
@@ -72,14 +74,14 @@ module RelaySync
     # @param message [String] hex-encoded message
     # @return [Array] NEG-MSG message array
     def build_neg_msg(subscription_id, message)
-      ["NEG-MSG", subscription_id, message]
+      [ "NEG-MSG", subscription_id, message ]
     end
 
     # Build a NEG-CLOSE message
     # @param subscription_id [String] subscription ID
     # @return [Array] NEG-CLOSE message array
     def build_neg_close(subscription_id)
-      ["NEG-CLOSE", subscription_id]
+      [ "NEG-CLOSE", subscription_id ]
     end
 
     # Validate a Nostr event structure
