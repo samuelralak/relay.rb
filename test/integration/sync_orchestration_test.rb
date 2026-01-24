@@ -64,7 +64,7 @@ class SyncOrchestrationTest < ActiveSupport::TestCase
     )
 
     # Active syncing state: orchestration skips
-    with_relays(backfill: [relay]) do
+    with_relays(backfill: [ relay ]) do
       SyncOrchestratorJob.new.perform(mode: "backfill")
       assert_empty enqueued_jobs, "Should skip actively syncing relay"
     end
@@ -78,7 +78,7 @@ class SyncOrchestrationTest < ActiveSupport::TestCase
     assert_equal "idle", sync_state.status
 
     # Now orchestration dispatches
-    with_relays(backfill: [relay]) do
+    with_relays(backfill: [ relay ]) do
       SyncOrchestratorJob.new.perform(mode: "backfill")
       assert_equal 1, enqueued_jobs.size, "Should dispatch after recovery"
     end
@@ -108,7 +108,7 @@ class SyncOrchestrationTest < ActiveSupport::TestCase
     assert_nil errored_state.error_message
 
     # Orchestration can now dispatch
-    with_relays(backfill: [relay]) do
+    with_relays(backfill: [ relay ]) do
       SyncOrchestratorJob.new.perform(mode: "backfill")
       assert_equal 1, enqueued_jobs.size
     end

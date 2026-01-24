@@ -121,9 +121,9 @@ class NegentropySyncJob < ApplicationJob
     # Fall back to polling sync with the same chunk time range
     fallback_filter = if @current_chunk
                         @base_filter.merge(@current_chunk)
-                      else
+    else
                         @base_filter.merge(since: @backfill_target.to_i)
-                      end
+    end
     PollingSyncJob.perform_later(
       relay_url: relay_url,
       filter: fallback_filter,

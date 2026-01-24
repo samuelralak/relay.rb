@@ -39,7 +39,7 @@ module Sync
       event_data = valid_event_data(
         content: "Test content",
         kind: 7,
-        tags: [["e", "a" * 64]]
+        tags: [ [ "e", "a" * 64 ] ]
       )
 
       ProcessEvent.call(event_data: event_data)

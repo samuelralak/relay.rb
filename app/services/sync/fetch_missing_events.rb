@@ -64,7 +64,7 @@ module Sync
         connection.subscribe(sub_id, [ filter ])
         wait_for_eose(mutex, condition, state, sub_id)
         final_batch_count = batch_mutex.synchronize { batch_fetched }
-        [state[:eose_received], final_batch_count]
+        [ state[:eose_received], final_batch_count ]
       ensure
         RelaySync.manager.unregister_event_handler(sub_id)
         RelaySync.manager.unregister_eose_handler(sub_id)

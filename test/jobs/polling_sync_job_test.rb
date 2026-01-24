@@ -125,7 +125,7 @@ class PollingSyncJobTest < ActiveSupport::TestCase
     assert_enqueued_with(job: PollingSyncJob, queue: "sync") do
       PollingSyncJob.perform_later(
         relay_url: @relay_url,
-        filter: { kinds: [1] },
+        filter: { kinds: [ 1 ] },
         mode: "realtime"
       )
     end
@@ -134,7 +134,7 @@ class PollingSyncJobTest < ActiveSupport::TestCase
   test "enqueued job preserves arguments" do
     PollingSyncJob.perform_later(
       relay_url: @relay_url,
-      filter: { kinds: [1], since: 12345 },
+      filter: { kinds: [ 1 ], since: 12345 },
       mode: "backfill"
     )
 
@@ -144,7 +144,7 @@ class PollingSyncJobTest < ActiveSupport::TestCase
     assert_equal @relay_url, args["relay_url"]
     assert_equal "backfill", args["mode"]
     # Filter keys are preserved (ActiveJob adds _aj_symbol_keys for serialization)
-    assert_equal [1], args["filter"]["kinds"]
+    assert_equal [ 1 ], args["filter"]["kinds"]
     assert_equal 12345, args["filter"]["since"]
   end
 end

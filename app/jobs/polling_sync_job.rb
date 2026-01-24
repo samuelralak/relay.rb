@@ -198,7 +198,7 @@ class PollingSyncJob < ApplicationJob
   def update_final_cursor
     event_id, timestamp, remaining = @counter_mutex.synchronize do
       return unless @latest_event_id && @events_this_batch > 0
-      [@latest_event_id, @latest_timestamp, @events_this_batch % checkpoint_interval]
+      [ @latest_event_id, @latest_timestamp, @events_this_batch % checkpoint_interval ]
     end
 
     if remaining && remaining > 0

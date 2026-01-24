@@ -125,7 +125,7 @@ module Sync
           end
 
           # Wait with a maximum of 30 seconds per iteration to ensure we check the deadline
-          wait_time = [remaining, 30].min
+          wait_time = [ remaining, 30 ].min
           @condition.wait(@mutex, wait_time)
         end
         true

@@ -250,15 +250,15 @@ class SyncStateTest < ActiveSupport::TestCase
 
   # Class methods - compute_filter_hash
   test "compute_filter_hash produces consistent hash for same inputs" do
-    hash1 = SyncState.compute_filter_hash(direction: "down", filter: { kinds: [1, 3] })
-    hash2 = SyncState.compute_filter_hash(direction: "down", filter: { kinds: [1, 3] })
+    hash1 = SyncState.compute_filter_hash(direction: "down", filter: { kinds: [ 1, 3 ] })
+    hash2 = SyncState.compute_filter_hash(direction: "down", filter: { kinds: [ 1, 3 ] })
 
     assert_equal hash1, hash2
   end
 
   test "compute_filter_hash ignores since and until in filter" do
-    hash1 = SyncState.compute_filter_hash(direction: "down", filter: { kinds: [1] })
-    hash2 = SyncState.compute_filter_hash(direction: "down", filter: { kinds: [1], since: 12345, until: 67890 })
+    hash1 = SyncState.compute_filter_hash(direction: "down", filter: { kinds: [ 1 ] })
+    hash2 = SyncState.compute_filter_hash(direction: "down", filter: { kinds: [ 1 ], since: 12345, until: 67890 })
 
     assert_equal hash1, hash2
   end
@@ -271,8 +271,8 @@ class SyncStateTest < ActiveSupport::TestCase
   end
 
   test "compute_filter_hash differs by filter content" do
-    hash1 = SyncState.compute_filter_hash(direction: "down", filter: { kinds: [1] })
-    hash2 = SyncState.compute_filter_hash(direction: "down", filter: { kinds: [1, 3] })
+    hash1 = SyncState.compute_filter_hash(direction: "down", filter: { kinds: [ 1 ] })
+    hash2 = SyncState.compute_filter_hash(direction: "down", filter: { kinds: [ 1, 3 ] })
 
     assert_not_equal hash1, hash2
   end
@@ -285,8 +285,8 @@ class SyncStateTest < ActiveSupport::TestCase
   end
 
   test "compute_filter_hash normalizes key order" do
-    hash1 = SyncState.compute_filter_hash(direction: "down", filter: { kinds: [1], authors: ["abc"] })
-    hash2 = SyncState.compute_filter_hash(direction: "down", filter: { authors: ["abc"], kinds: [1] })
+    hash1 = SyncState.compute_filter_hash(direction: "down", filter: { kinds: [ 1 ], authors: [ "abc" ] })
+    hash2 = SyncState.compute_filter_hash(direction: "down", filter: { authors: [ "abc" ], kinds: [ 1 ] })
 
     assert_equal hash1, hash2
   end
@@ -409,9 +409,9 @@ class SyncStateTest < ActiveSupport::TestCase
   test "resume_filter uses last_download_timestamp when present" do
     @sync_state.last_download_timestamp = Time.at(1000)
 
-    filter = @sync_state.resume_filter(base_filter: { kinds: [1] }, overlap_seconds: 60)
+    filter = @sync_state.resume_filter(base_filter: { kinds: [ 1 ] }, overlap_seconds: 60)
 
-    assert_equal [1], filter[:kinds]
+    assert_equal [ 1 ], filter[:kinds]
     assert_equal 940, filter[:since]  # 1000 - 60
   end
 
@@ -426,9 +426,9 @@ class SyncStateTest < ActiveSupport::TestCase
   test "resume_filter returns filter without since when no timestamp and no fallback" do
     @sync_state.last_download_timestamp = nil
 
-    filter = @sync_state.resume_filter(base_filter: { kinds: [1] })
+    filter = @sync_state.resume_filter(base_filter: { kinds: [ 1 ] })
 
-    assert_equal [1], filter[:kinds]
+    assert_equal [ 1 ], filter[:kinds]
     assert_not filter.key?(:since)
   end
 
