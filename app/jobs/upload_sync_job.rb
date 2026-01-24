@@ -38,21 +38,22 @@ class UploadSyncJob < ApplicationJob
       relay_url:,
       record_ids: events_scope.pluck(:id)
     )
+    values = result.value!
 
     # Update cursor to latest uploaded event
-    if result[:published] > 0
+    if values[:published] > 0
       latest = events_scope.order(nostr_created_at: :desc).first
       @sync_state.mark_upload_progress!(
         event_id: latest.event_id,
         timestamp: latest.nostr_created_at,
-        count: result[:published]
+        count: values[:published]
       )
     end
 
     @sync_state.mark_completed!
 
     Rails.logger.info "[UploadSyncJob] Completed #{relay_url}: " \
-                      "#{result[:published]} published, #{result[:duplicates]} duplicates, #{result[:failed]} failed"
+                      "#{values[:published]} published, #{values[:duplicates]} duplicates, #{values[:failed]} failed"
   rescue StandardError => e
     Rails.logger.error "[UploadSyncJob] Error uploading to #{relay_url}: #{e.message}"
     @sync_state&.mark_error!(e.message)

@@ -9,9 +9,10 @@ class StaleSyncRecoveryJob < ApplicationJob
     Rails.logger.debug "[StaleSyncRecoveryJob] Checking for stale syncs..."
 
     result = Sync::RecoverStale.call
+    values = result.value!
 
-    if result[:recovered_stale] > 0 || result[:retried_errors] > 0
-      Rails.logger.info "[StaleSyncRecoveryJob] Recovered: #{result[:recovered_stale]} stale, #{result[:retried_errors]} errors"
+    if values[:recovered_stale] > 0 || values[:retried_errors] > 0
+      Rails.logger.info "[StaleSyncRecoveryJob] Recovered: #{values[:recovered_stale]} stale, #{values[:retried_errors]} errors"
     end
   rescue StandardError => e
     Rails.logger.error "[StaleSyncRecoveryJob] Error during recovery: #{e.message}"

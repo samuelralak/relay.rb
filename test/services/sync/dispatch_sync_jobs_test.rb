@@ -3,7 +3,7 @@
 require "test_helper"
 
 module Sync
-  class OrchestratorTest < ActiveSupport::TestCase
+  class DispatchSyncJobsTest < ActiveSupport::TestCase
     include ActiveJob::TestHelper
 
     # =========================================================================
@@ -73,8 +73,8 @@ module Sync
     test "backfill mode dispatches NegentropySyncJob for negentropy-capable relays" do
       with_fake_configuration(backfill: [ @negentropy_relay ]) do
         assert_enqueued_with(job: NegentropySyncJob) do
-          result = Orchestrator.call(mode: "backfill")
-          assert_equal 1, result[:dispatched]
+          result = DispatchSyncJobs.call(mode: "backfill")
+          assert_equal 1, result.value![:dispatched]
         end
       end
     end
@@ -82,15 +82,15 @@ module Sync
     test "backfill mode dispatches PollingSyncJob for non-negentropy relays" do
       with_fake_configuration(backfill: [ @polling_relay ]) do
         assert_enqueued_with(job: PollingSyncJob) do
-          result = Orchestrator.call(mode: "backfill")
-          assert_equal 1, result[:dispatched]
+          result = DispatchSyncJobs.call(mode: "backfill")
+          assert_equal 1, result.value![:dispatched]
         end
       end
     end
 
     test "backfill mode job has correct relay_url" do
       with_fake_configuration(backfill: [ @negentropy_relay ]) do
-        Orchestrator.call(mode: "backfill")
+        DispatchSyncJobs.call(mode: "backfill")
 
         enqueued_job = enqueued_jobs.find { |j| j["job_class"] == "NegentropySyncJob" }
         assert_not_nil enqueued_job
@@ -106,15 +106,15 @@ module Sync
     test "realtime mode dispatches PollingSyncJob" do
       with_fake_configuration(download: [ @polling_relay ]) do
         assert_enqueued_with(job: PollingSyncJob) do
-          result = Orchestrator.call(mode: "realtime")
-          assert_equal 1, result[:dispatched]
+          result = DispatchSyncJobs.call(mode: "realtime")
+          assert_equal 1, result.value![:dispatched]
         end
       end
     end
 
     test "realtime mode job has realtime mode and since filter" do
       with_fake_configuration(download: [ @polling_relay ]) do
-        Orchestrator.call(mode: "realtime")
+        DispatchSyncJobs.call(mode: "realtime")
 
         enqueued_job = enqueued_jobs.find { |j| j["job_class"] == "PollingSyncJob" }
         assert_not_nil enqueued_job
@@ -131,15 +131,15 @@ module Sync
     test "upload mode dispatches UploadSyncJob for upload relays" do
       with_fake_configuration(upload: [ @upload_relay ]) do
         assert_enqueued_with(job: UploadSyncJob) do
-          result = Orchestrator.call(mode: "upload")
-          assert_equal 1, result[:dispatched]
+          result = DispatchSyncJobs.call(mode: "upload")
+          assert_equal 1, result.value![:dispatched]
         end
       end
     end
 
     test "upload mode job has correct relay_url" do
       with_fake_configuration(upload: [ @upload_relay ]) do
-        Orchestrator.call(mode: "upload")
+        DispatchSyncJobs.call(mode: "upload")
 
         enqueued_job = enqueued_jobs.find { |j| j["job_class"] == "UploadSyncJob" }
         assert_not_nil enqueued_job
@@ -166,8 +166,8 @@ module Sync
 
       with_fake_configuration(backfill: [ @negentropy_relay ]) do
         assert_no_enqueued_jobs only: NegentropySyncJob do
-          result = Orchestrator.call(mode: "backfill")
-          assert_equal 0, result[:dispatched]
+          result = DispatchSyncJobs.call(mode: "backfill")
+          assert_equal 0, result.value![:dispatched]
         end
       end
     end
@@ -186,8 +186,8 @@ module Sync
 
       with_fake_configuration(backfill: [ @negentropy_relay ]) do
         assert_enqueued_with(job: NegentropySyncJob) do
-          result = Orchestrator.call(mode: "backfill")
-          assert_equal 1, result[:dispatched]
+          result = DispatchSyncJobs.call(mode: "backfill")
+          assert_equal 1, result.value![:dispatched]
         end
       end
     end
@@ -211,8 +211,8 @@ module Sync
 
       with_fake_configuration(backfill: [ @negentropy_relay ]) do
         assert_no_enqueued_jobs only: NegentropySyncJob do
-          result = Orchestrator.call(mode: "backfill")
-          assert_equal 0, result[:dispatched]
+          result = DispatchSyncJobs.call(mode: "backfill")
+          assert_equal 0, result.value![:dispatched]
         end
       end
     end
@@ -223,7 +223,7 @@ module Sync
 
     test "dispatches job for specific relay when relay_url provided" do
       with_fake_configuration(backfill: [ @negentropy_relay, @polling_relay ]) do
-        Orchestrator.call(mode: "backfill", relay_url: @negentropy_relay.url)
+        DispatchSyncJobs.call(mode: "backfill", relay_url: @negentropy_relay.url)
 
         # Should only enqueue job for the specified relay
         negentropy_jobs = enqueued_jobs.select { |j| j["job_class"] == "NegentropySyncJob" }
@@ -240,10 +240,10 @@ module Sync
 
     test "returns dispatched count and mode" do
       with_fake_configuration(backfill: [ @negentropy_relay, @polling_relay ]) do
-        result = Orchestrator.call(mode: "backfill")
+        result = DispatchSyncJobs.call(mode: "backfill")
 
-        assert_equal 2, result[:dispatched]
-        assert_equal "backfill", result[:mode]
+        assert_equal 2, result.value![:dispatched]
+        assert_equal "backfill", result.value![:mode]
       end
     end
   end

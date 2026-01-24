@@ -295,7 +295,7 @@ SyncOrchestratorJob              PollingSyncJob                    Remote Relay
 ### Negentropy Sync Flow (NIP-77)
 
 ```
-NegentropySyncJob               StartNegentropy                Remote Relay
+NegentropySyncJob               SyncWithNegentropy             Remote Relay
       │                               │                              │
       │  call service                 │                              │
       │──────────────────────────────►│                              │
@@ -318,7 +318,7 @@ NegentropySyncJob               StartNegentropy                Remote Relay
       │                               │                              │
       │                               │  6. have_ids / need_ids      │
       │                               │                              │
-      │                               │  7. FetchMissingEvents       │
+      │                               │  7. FetchEvents              │
       │                               │  8. REQ for needed events    │
       │                               │─────────────────────────────►│
       │                               │                              │
@@ -361,9 +361,9 @@ NegentropySyncJob               StartNegentropy                Remote Relay
 
 | Service | Description |
 |---------|-------------|
-| **Orchestrator** | Dispatches sync jobs based on mode and relay config |
-| **StartNegentropy** | Performs NIP-77 reconciliation |
-| **FetchMissingEvents** | Fetches events identified by negentropy |
+| **DispatchSyncJobs** | Dispatches sync jobs based on mode and relay config |
+| **SyncWithNegentropy** | Performs NIP-77 reconciliation |
+| **FetchEvents** | Fetches events by ID (in actions/) |
 | **UploadEvents** | Uploads local events to relays |
 | **ProcessEvent** | Validates and saves incoming events |
 | **RecoverStale** | Recovers stuck/errored sync states |

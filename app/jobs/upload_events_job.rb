@@ -11,12 +11,13 @@ class UploadEventsJob < ApplicationJob
       relay_url:,
       record_ids:
     )
+    values = result.value!
 
-    if result[:reason] == "no_events"
+    if values[:reason] == "no_events"
       Rails.logger.info "[UploadEventsJob] No events to upload to #{relay_url}"
     else
       Rails.logger.info "[UploadEventsJob] Upload complete to #{relay_url}: " \
-                        "#{result[:published]} published, #{result[:duplicates]} duplicates, #{result[:failed]} failed"
+                        "#{values[:published]} published, #{values[:duplicates]} duplicates, #{values[:failed]} failed"
     end
   rescue RelaySync::ConnectionError => e
     Rails.logger.error "[UploadEventsJob] #{e.message}"

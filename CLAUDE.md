@@ -71,7 +71,6 @@ Services follow a three-tier hierarchy:
 All services inherit from `BaseService` which provides:
 - `dry-initializer` for typed options
 - `dry-monads` Result types (Success/Failure)
-- Do notation for chaining operations
 - Class-level `call` method
 
 ```ruby
@@ -90,8 +89,8 @@ Services return `Success` or `Failure` results:
 ```ruby
 result = MyService.call(input: "value")
 result.success?       # true/false
-result[:key]          # Hash-like access (backward compatible)
-result.value![:key]   # Explicit value access
+result.value![:key]   # Access value on Success
+result.failure        # Access error on Failure
 ```
 
 ### Naming Conventions
@@ -105,7 +104,6 @@ result.value![:key]   # Explicit value access
 ```
 app/services/
 ├── base_service.rb              # Base class with dry-monads
-├── result_wrapper.rb            # Backward-compatible Result wrapper
 ├── types.rb                     # Type definitions
 ├── concerns/
 │   └── sync/

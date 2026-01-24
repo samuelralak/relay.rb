@@ -13,8 +13,8 @@ module Sync
       error_result = Actions::RetryErroredSyncs.call(retry_after_seconds: error_retry_after)
 
       Success(
-        recovered_stale: stale_result[:recovered],
-        retried_errors: error_result[:retried]
+        recovered_stale: stale_result.value![:recovered],
+        retried_errors: error_result.value![:retried]
       )
     end
   end

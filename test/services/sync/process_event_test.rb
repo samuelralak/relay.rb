@@ -30,8 +30,8 @@ module Sync
       assert_difference "Event.count", 1 do
         result = ProcessEvent.call(event_data:)
 
-        assert result[:success], "Expected success but got: #{result.inspect}"
-        assert_equal event_data[:id], result[:event_id]
+        assert result.success?, "Expected success but got: #{result.inspect}"
+        assert_equal event_data[:id], result.value![:event_id]
       end
     end
 
@@ -67,7 +67,7 @@ module Sync
 
       result = ProcessEvent.call(event_data:)
 
-      assert result[:success]
+      assert result.success?
       assert Event.exists?(event_id: event_data["id"])
     end
 
@@ -79,7 +79,7 @@ module Sync
         source_relay: "wss://relay.example.com"
       )
 
-      assert result[:success]
+      assert result.success?
     end
 
     # =========================================================================
@@ -91,14 +91,14 @@ module Sync
 
       # Create the event first
       first_result = ProcessEvent.call(event_data:)
-      assert first_result[:success]
+      assert first_result.success?
 
       # Try to create again
       assert_no_difference "Event.count" do
         result = ProcessEvent.call(event_data:)
 
-        assert result[:skipped]
-        assert_equal "duplicate", result[:reason]
+        assert result.value![:skipped]
+        assert_equal "duplicate", result.value![:reason]
       end
     end
 
@@ -111,8 +111,8 @@ module Sync
 
       result = ProcessEvent.call(event_data: duplicate_data)
 
-      assert result[:skipped]
-      assert_equal "duplicate", result[:reason]
+      assert result.value![:skipped]
+      assert_equal "duplicate", result.value![:reason]
     end
 
     # =========================================================================
@@ -124,9 +124,8 @@ module Sync
 
       result = ProcessEvent.call(event_data: invalid_data)
 
-      assert_not result[:success]
-      assert_not result[:skipped]
-      assert result[:error].present?
+      assert result.failure?
+      assert result.failure.present?
     end
 
     test "returns error for invalid signature" do
@@ -134,8 +133,8 @@ module Sync
 
       result = ProcessEvent.call(event_data: invalid_data)
 
-      assert_not result[:success]
-      assert result[:error].present?
+      assert result.failure?
+      assert result.failure.present?
     end
 
     # =========================================================================
@@ -147,7 +146,7 @@ module Sync
 
       result = ProcessEvent.call(event_data:)
 
-      assert result[:success]
+      assert result.success?
       event = Event.find_by(event_id: event_data[:id])
       assert_equal [], event.tags
     end
@@ -157,7 +156,7 @@ module Sync
 
       result = ProcessEvent.call(event_data:)
 
-      assert result[:success]
+      assert result.success?
       event = Event.find_by(event_id: event_data[:id])
       assert_equal "", event.content
     end
@@ -167,7 +166,7 @@ module Sync
 
       result = ProcessEvent.call(event_data:)
 
-      assert result[:success]
+      assert result.success?
       event = Event.find_by(event_id: event_data[:id])
       assert_equal "", event.content
     end
@@ -177,7 +176,7 @@ module Sync
 
       result = ProcessEvent.call(event_data:)
 
-      assert result[:success]
+      assert result.success?
       event = Event.find_by(event_id: event_data[:id])
       assert_equal [], event.tags
     end

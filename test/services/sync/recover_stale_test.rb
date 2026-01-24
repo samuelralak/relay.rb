@@ -24,7 +24,7 @@ module Sync
 
       stale_sync.reload
       assert_equal "idle", stale_sync.status
-      assert_equal 1, result[:recovered_stale]
+      assert_equal 1, result.value![:recovered_stale]
     end
 
     test "does not recover recently updated syncing states" do
@@ -38,7 +38,7 @@ module Sync
 
       recent_sync.reload
       assert_equal "syncing", recent_sync.status
-      assert_equal 0, result[:recovered_stale]
+      assert_equal 0, result.value![:recovered_stale]
     end
 
     test "only recovers syncing states, not other statuses" do
@@ -51,7 +51,7 @@ module Sync
       completed.reload
       assert_equal "idle", idle.status
       assert_equal "completed", completed.status
-      assert_equal 0, result[:recovered_stale]
+      assert_equal 0, result.value![:recovered_stale]
     end
 
     test "recovers multiple stale syncs" do
@@ -65,7 +65,7 @@ module Sync
 
       result = RecoverStale.call(stale_threshold: @stale_threshold.to_i)
 
-      assert_equal 3, result[:recovered_stale]
+      assert_equal 3, result.value![:recovered_stale]
       assert_equal 0, SyncState.syncing.count
     end
 
@@ -86,7 +86,7 @@ module Sync
       old_error.reload
       assert_equal "idle", old_error.status
       assert_nil old_error.error_message
-      assert_equal 1, result[:retried_errors]
+      assert_equal 1, result.value![:retried_errors]
     end
 
     test "does not retry recent errors" do
@@ -102,7 +102,7 @@ module Sync
       recent_error.reload
       assert_equal "error", recent_error.status
       assert_equal "Connection refused", recent_error.error_message
-      assert_equal 0, result[:retried_errors]
+      assert_equal 0, result.value![:retried_errors]
     end
 
     # =========================================================================
@@ -126,8 +126,8 @@ module Sync
         error_retry_after: @error_retry_after.to_i
       )
 
-      assert_equal 1, result[:recovered_stale]
-      assert_equal 1, result[:retried_errors]
+      assert_equal 1, result.value![:recovered_stale]
+      assert_equal 1, result.value![:retried_errors]
 
       stale.reload
       errored.reload
@@ -144,8 +144,8 @@ module Sync
         error_retry_after: @error_retry_after.to_i
       )
 
-      assert_equal 0, result[:recovered_stale]
-      assert_equal 0, result[:retried_errors]
+      assert_equal 0, result.value![:recovered_stale]
+      assert_equal 0, result.value![:retried_errors]
     end
 
     private

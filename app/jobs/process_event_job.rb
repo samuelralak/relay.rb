@@ -17,12 +17,15 @@ class ProcessEventJob < ApplicationJob
       source_relay:
     )
 
-    if result[:success]
-      Rails.logger.info "[ProcessEventJob] Saved event #{result[:event_id][0..7]}... from #{source_relay}"
-    elsif result[:skipped]
-      Rails.logger.info "[ProcessEventJob] Skipped #{event_data[:id][0..7]}... (#{result[:reason]})"
+    if result.success?
+      values = result.value!
+      if values[:skipped]
+        Rails.logger.info "[ProcessEventJob] Skipped #{event_data[:id][0..7]}... (#{values[:reason]})"
+      else
+        Rails.logger.info "[ProcessEventJob] Saved event #{values[:event_id][0..7]}... from #{source_relay}"
+      end
     else
-      Rails.logger.error "[ProcessEventJob] Failed to save event: #{result[:error]}"
+      Rails.logger.error "[ProcessEventJob] Failed to save event: #{result.failure}"
     end
   rescue JSON::ParserError => e
     Rails.logger.error "[ProcessEventJob] Invalid JSON: #{e.message}"

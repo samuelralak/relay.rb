@@ -11,7 +11,7 @@ class SyncOrchestratorJob < ApplicationJob
 
     result = Sync::DispatchSyncJobs.call(mode:)
 
-    Rails.logger.info "[SyncOrchestratorJob] Dispatched #{result[:dispatched]} sync job(s)"
+    Rails.logger.info "[SyncOrchestratorJob] Dispatched #{result.value![:dispatched]} sync job(s)"
   rescue StandardError => e
     Rails.logger.error "[SyncOrchestratorJob] Error during orchestration: #{e.message}"
     raise

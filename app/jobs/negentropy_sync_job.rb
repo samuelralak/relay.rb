@@ -77,14 +77,14 @@ class NegentropySyncJob < ApplicationJob
       manage_status: false
     )
 
-    # Reload to get updated events_downloaded from StartNegentropy
+    # Reload to get updated events_downloaded from SyncWithNegentropy
     @sync_state.reload
 
     # Mark this chunk as completed
     @sync_state.mark_backfill_chunk_completed!(chunk_start: Time.at(@current_chunk[:since]))
 
     Rails.logger.info "[NegentropySyncJob] Chunk complete for #{relay_url}. " \
-                      "Have: #{result[:have_ids].size}, Need: #{result[:need_ids].size}"
+                      "Have: #{result.value![:have_ids].size}, Need: #{result.value![:need_ids].size}"
     Rails.logger.info "[NegentropySyncJob] Backfill progress: #{@sync_state.backfill_progress_percent}%"
 
     # Schedule next chunk immediately if backfill not complete
@@ -152,7 +152,7 @@ class NegentropySyncJob < ApplicationJob
 
   def find_or_create_sync_state
     # Use "down" for filter_hash consistency - ensures one SyncState per relay for downloads
-    # The @direction is still used by StartNegentropy for upload behavior
+    # The @direction is still used by SyncWithNegentropy for upload behavior
     SyncState.for_sync(
       relay_url: @relay_url,
       direction: "down",

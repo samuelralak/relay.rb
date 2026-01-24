@@ -11,7 +11,7 @@ namespace :sync do
 
     result = Sync::DispatchSyncJobs.call(mode: "backfill")
 
-    puts "[sync:boot] Dispatched #{result[:dispatched]} backfill job(s)"
+    puts "[sync:boot] Dispatched #{result.value![:dispatched]} backfill job(s)"
   end
   desc "Show sync status for all relays"
   task status: :environment do
@@ -99,7 +99,7 @@ namespace :sync do
       result = Sync::DispatchSyncJobs.call(mode:)
     end
 
-    puts "Dispatched #{result[:dispatched]} job(s)"
+    puts "Dispatched #{result.value![:dispatched]} job(s)"
     puts ""
     puts "Monitor progress with: bin/rails sync:status"
   end
@@ -109,8 +109,9 @@ namespace :sync do
     puts "Recovering stale syncs..."
 
     result = Sync::RecoverStale.call
+    values = result.value!
 
-    puts "Recovered: #{result[:recovered_stale]} stale, #{result[:retried_errors]} errors"
+    puts "Recovered: #{values[:recovered_stale]} stale, #{values[:retried_errors]} errors"
   end
 
   desc "Reset sync state for a relay (or all relays if no URL given)"
