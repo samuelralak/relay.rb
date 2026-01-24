@@ -3,17 +3,44 @@
 
 default: &default
   upstream_relays:
+    # Strfry relays with NIP-77 Negentropy support
+    - url: wss://relay.snort.social
+      enabled: true
+      backfill: true
+      negentropy: true
+      direction: down
+    - url: wss://relay.primal.net
+      enabled: true
+      backfill: true
+      negentropy: false  # Relay returns "negentropy disabled" - doesn't support NIP-77
+      direction: down
+    - url: wss://offchain.pub
+      enabled: true
+      backfill: true
+      negentropy: true
+      direction: down
+    - url: wss://nostr.mom
+      enabled: true
+      backfill: true
+      negentropy: false  # strfry but negentropy disabled on this instance
+      direction: down
+    - url: wss://relay.current.fyi
+      enabled: false  # DNS resolution failed - relay may be down
+      backfill: true
+      negentropy: false
+      direction: down
+    - url: wss://pyramid.fiatjaf.com
+      enabled: true
+      backfill: true
+      negentropy: true  # Khatru-based, works without AUTH for reads
+      direction: down
+    # Standard relays for streaming (no negentropy)
     - url: wss://relay.damus.io
       enabled: true
-      backfill: true
-      negentropy: true
+      backfill: false
+      negentropy: false  # Has query limits
       direction: down
     - url: wss://nos.lol
-      enabled: true
-      backfill: true
-      negentropy: true
-      direction: down
-    - url: wss://relay.nostr.band
       enabled: true
       backfill: false
       negentropy: false
@@ -24,7 +51,7 @@ default: &default
     max_concurrent_connections: 10
     reconnect_delay_seconds: 5
     max_reconnect_attempts: 10
-    backfill_since_hours: 168
+    backfill_since_hours: 43800  # 5 years
     event_kinds:
       - 0      # metadata
       - 1      # text note
@@ -34,8 +61,17 @@ default: &default
       - 7      # reaction
       - 30023  # long-form content
     negentropy_frame_size: 60000
+    negentropy_chunk_hours: 168       # Sync 1 week at a time for Negentropy
     upload_batch_size: 50
     upload_delay_ms: 100
+    # Robustness settings for resumable backfill
+    resume_overlap_seconds: 300   # Go back 5 minutes when resuming to prevent gaps
+    checkpoint_interval: 100      # Save progress every 100 events
+    # Polling settings (for job-based sync orchestration)
+    polling_window_minutes: 15      # How far back to look when polling
+    polling_timeout_seconds: 30     # Timeout for each poll operation
+    stale_threshold_minutes: 10     # When to consider a sync stale
+    error_retry_after_minutes: 30   # How long before retrying errored syncs
 
 development:
   <<: *default
