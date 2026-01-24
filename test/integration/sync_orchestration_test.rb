@@ -166,4 +166,43 @@ class SyncOrchestrationTest < ActiveSupport::TestCase
     state.mark_completed!
     assert_equal "completed", state.status
   end
+
+  # =========================================================================
+  # Polling Backfill Lifecycle
+  # =========================================================================
+
+  test "polling backfill lifecycle: initializes, chunks forward, completes" do
+    relay = create_fake_relay(url: "wss://polling-backfill.relay.com", negentropy: false, backfill: true)
+
+    with_relays(backfill: [ relay ]) do
+      # First dispatch
+      Sync::OrchestratorJob.new.perform(mode: "backfill")
+
+      job = enqueued_jobs.find { |j| j["job_class"] == "Sync::PollingJob" }
+      assert_not_nil job
+      args = job["arguments"].first
+      assert args["backfill_target"].present?
+    end
+
+    # Simulate state after completion
+    filter_hash = SyncState.compute_filter_hash(direction: "down", filter: {})
+    state = SyncState.find_or_create_by!(relay_url: relay.url, filter_hash:) do |s|
+      s.direction = "down"
+      s.events_downloaded = 0
+      s.events_uploaded = 0
+    end
+    state.update!(
+      status: "completed",
+      backfill_target: 1.month.ago,
+      backfill_until: 30.minutes.ago
+    )
+
+    clear_enqueued_jobs
+
+    # Orchestration should skip completed relay
+    with_relays(backfill: [ relay ]) do
+      Sync::OrchestratorJob.new.perform(mode: "backfill")
+      assert_empty enqueued_jobs, "Should skip completed polling backfill"
+    end
+  end
 end

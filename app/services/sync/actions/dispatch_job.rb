@@ -11,13 +11,17 @@ module Sync
       def call
         return Failure(:relay_disabled) unless relay.enabled?
         return Failure(:already_syncing) if already_syncing?
-        return Failure(:backfill_complete) if backfill_complete?
+        return Failure(:backfill_complete) if backfill_mode? && backfill_complete?
 
         dispatch_job
         Success(relay_url: relay.url, mode:)
       end
 
       private
+
+      def backfill_mode?
+        [RelaySync::SyncMode::BACKFILL, RelaySync::SyncMode::FULL].include?(mode)
+      end
 
       def dispatch_job
         case mode
@@ -40,11 +44,13 @@ module Sync
             chunk_hours: sync_settings.negentropy_chunk_hours
           )
         else
-          filter = mode == RelaySync::SyncMode::FULL ? {} : backfill_filter
+          # For backfill mode, pass backfill params for chunked processing
           Sync::PollingJob.perform_later(
             relay_url: relay.url,
-            filter:,
-            mode:
+            filter: {},
+            mode:,
+            backfill_target: backfill_target_timestamp,
+            chunk_hours: sync_settings.polling_chunk_hours
           )
         end
       end
@@ -67,7 +73,15 @@ module Sync
       end
 
       def backfill_complete?
-        sync_state&.backfill_complete?
+        return false unless sync_state
+
+        # For negentropy relays, use existing backward backfill check
+        # For polling relays, use new forward backfill check
+        if relay.negentropy?
+          sync_state.backfill_complete?
+        else
+          sync_state.polling_backfill_complete?
+        end
       end
 
       def sync_state

@@ -2,7 +2,7 @@
 
 module Sync
   # Polls a relay for events using REQ/EOSE pattern
-  # Replaces streaming with short-lived connections for better job model fit
+  # Supports both realtime polling and chunked backfill modes
   class PollingJob < ApplicationJob
     queue_as :sync
 
@@ -11,10 +11,17 @@ module Sync
     # @param relay_url [String] URL of the relay to poll
     # @param filter [Hash] Nostr filter for events to receive
     # @param mode [String] sync mode: "realtime" or "backfill"
-    def perform(relay_url:, filter: {}, mode: RelaySync::SyncMode::REALTIME)
+    # @param backfill_target [Integer, nil] Unix timestamp of oldest events to sync (nil = realtime mode)
+    # @param chunk_hours [Integer] Size of each backfill chunk in hours
+    # @param continuation [Boolean] If true, this is a self-scheduled continuation
+    def perform(relay_url:, filter: {}, mode: RelaySync::SyncMode::REALTIME,
+                backfill_target: nil, chunk_hours: 168, continuation: false)
       @relay_url = relay_url
       @filter = filter.symbolize_keys
       @mode = mode
+      @backfill_target = backfill_target ? Time.at(backfill_target) : nil
+      @chunk_hours = chunk_hours
+      @continuation = continuation
       @events_this_batch = 0
       @latest_timestamp = nil
       @latest_event_id = nil
@@ -23,35 +30,24 @@ module Sync
 
       @sync_state = find_or_create_sync_state
 
-      # Skip if already syncing and not stale
-      if @sync_state.syncing? && !@sync_state.stale?(threshold: stale_threshold)
-        Rails.logger.info "[Sync::PollingJob] Skipping #{relay_url} - already syncing"
-        @status_handled = true  # Don't reset - another job owns this status
-        return
+      # Skip if already syncing (unless continuation)
+      unless @continuation
+        if @sync_state.syncing? && !@sync_state.stale?(threshold: stale_threshold)
+          Rails.logger.info "[Sync::PollingJob] Skipping #{relay_url} - already syncing"
+          @status_handled = true  # Don't reset - another job owns this status
+          return
+        end
       end
 
       # Reset stale syncs
       @sync_state.reset_to_idle! if @sync_state.stale?(threshold: stale_threshold)
 
-      # Build effective filter with resume logic
-      effective_filter = @sync_state.resume_filter(
-        base_filter: @filter,
-        fallback_since: @filter[:since]
-      )
-
-      Rails.logger.info "[Sync::PollingJob] Polling #{relay_url} (mode: #{mode})"
-      Rails.logger.info "[Sync::PollingJob] Filter: #{effective_filter}"
-
-      ensure_connection!
-      @sync_state.mark_syncing!
-
-      events_received = poll_events(effective_filter)
-
-      # Reset to idle - polling is incremental, not a complete backfill
-      # The sync will be picked up again by the next scheduled orchestration
-      @sync_state.reset_to_idle!
-      @status_handled = true
-      Rails.logger.info "[Sync::PollingJob] Finished polling #{relay_url}: #{events_received} events received"
+      # Branch based on mode
+      if backfill_mode?
+        perform_chunked_backfill
+      else
+        perform_realtime_poll
+      end
     rescue StandardError => e
       Rails.logger.error "[Sync::PollingJob] Error polling #{relay_url}: #{e.message}"
       @sync_state&.mark_error!(e.message)
@@ -67,6 +63,90 @@ module Sync
     end
 
     private
+
+    def backfill_mode?
+      (@mode == RelaySync::SyncMode::BACKFILL || @mode == RelaySync::SyncMode::FULL) &&
+        @backfill_target.present?
+    end
+
+    def perform_chunked_backfill
+      # Initialize polling backfill tracking
+      @sync_state.initialize_polling_backfill!(from: @backfill_target)
+
+      # Check if already complete
+      if @sync_state.polling_backfill_complete?
+        Rails.logger.info "[Sync::PollingJob] Backfill complete for #{@relay_url}"
+        @sync_state.mark_completed! unless @sync_state.completed?
+        @status_handled = true
+        return
+      end
+
+      # Get next chunk
+      @current_chunk = @sync_state.next_polling_backfill_chunk(chunk_hours: @chunk_hours)
+      if @current_chunk.nil?
+        Rails.logger.info "[Sync::PollingJob] No more chunks for #{@relay_url}"
+        @sync_state.mark_completed!
+        @status_handled = true
+        return
+      end
+
+      # Merge chunk filter with base filter
+      effective_filter = @filter.merge(@current_chunk)
+
+      Rails.logger.info "[Sync::PollingJob] Backfill chunk: #{Time.at(@current_chunk[:since])} to #{Time.at(@current_chunk[:until])}"
+      Rails.logger.info "[Sync::PollingJob] Progress: #{@sync_state.polling_backfill_progress_percent}%"
+
+      ensure_connection!
+      @sync_state.mark_syncing!
+
+      # Poll events for this chunk
+      events_received = poll_events(effective_filter)
+
+      # Mark chunk completed
+      @sync_state.mark_polling_chunk_completed!(chunk_end: Time.at(@current_chunk[:until]))
+
+      Rails.logger.info "[Sync::PollingJob] Chunk complete: #{events_received} events"
+
+      # Schedule next chunk or mark completed
+      if @sync_state.polling_backfill_complete?
+        Rails.logger.info "[Sync::PollingJob] Backfill FULLY COMPLETE for #{@relay_url}"
+        @sync_state.mark_completed!
+        @status_handled = true
+      else
+        Rails.logger.info "[Sync::PollingJob] Scheduling next chunk"
+        self.class.perform_later(
+          relay_url: @relay_url,
+          filter: @filter,
+          mode: @mode,
+          backfill_target: @backfill_target.to_i,
+          chunk_hours: @chunk_hours,
+          continuation: true
+        )
+        @status_handled = true  # Status intentionally left as syncing for continuation
+      end
+    end
+
+    def perform_realtime_poll
+      # Build effective filter with resume logic
+      effective_filter = @sync_state.resume_filter(
+        base_filter: @filter,
+        fallback_since: @filter[:since]
+      )
+
+      Rails.logger.info "[Sync::PollingJob] Polling #{@relay_url} (mode: #{@mode})"
+      Rails.logger.info "[Sync::PollingJob] Filter: #{effective_filter}"
+
+      ensure_connection!
+      @sync_state.mark_syncing!
+
+      events_received = poll_events(effective_filter)
+
+      # Reset to idle - polling is incremental, not a complete backfill
+      # The sync will be picked up again by the next scheduled orchestration
+      @sync_state.reset_to_idle!
+      @status_handled = true
+      Rails.logger.info "[Sync::PollingJob] Finished polling #{@relay_url}: #{events_received} events received"
+    end
 
     def find_or_create_sync_state
       # Use centralized method for consistent filter_hash calculation

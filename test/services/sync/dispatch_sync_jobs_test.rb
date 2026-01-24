@@ -124,6 +124,28 @@ module Sync
       end
     end
 
+    test "realtime mode dispatches even after polling backfill completed" do
+      # Regression test: backfill_complete? check should not block realtime mode
+      filter_hash = SyncState.compute_filter_hash(direction: "down", filter: {})
+      SyncState.create!(
+        relay_url: @polling_relay.url,
+        filter_hash:,
+        direction: "down",
+        status: "completed",
+        backfill_target: 1.month.ago,
+        backfill_until: 30.minutes.ago, # Polling backfill complete
+        events_downloaded: 1000,
+        events_uploaded: 0
+      )
+
+      with_fake_configuration(download: [ @polling_relay ]) do
+        assert_enqueued_with(job: Sync::PollingJob) do
+          result = DispatchSyncJobs.call(mode: "realtime")
+          assert_equal 1, result.value![:dispatched]
+        end
+      end
+    end
+
     # =========================================================================
     # Upload Mode
     # =========================================================================
@@ -244,6 +266,53 @@ module Sync
 
         assert_equal 2, result.value![:dispatched]
         assert_equal "backfill", result.value![:mode]
+      end
+    end
+
+    # =========================================================================
+    # Polling Backfill Params
+    # =========================================================================
+
+    test "dispatch_download_job passes backfill params to PollingJob for non-negentropy relay" do
+      with_fake_configuration(backfill: [ @polling_relay ]) do
+        DispatchSyncJobs.call(mode: "backfill")
+
+        enqueued_job = enqueued_jobs.find { |j| j["job_class"] == "Sync::PollingJob" }
+        assert_not_nil enqueued_job
+        args = enqueued_job["arguments"].first
+        assert args["backfill_target"].present?, "Should have backfill_target"
+        assert args["chunk_hours"].present?, "Should have chunk_hours"
+      end
+    end
+
+    test "dispatch_download_job does not pass backfill params for realtime mode" do
+      with_fake_configuration(download: [ @polling_relay ]) do
+        DispatchSyncJobs.call(mode: "realtime")
+
+        enqueued_job = enqueued_jobs.find { |j| j["job_class"] == "Sync::PollingJob" }
+        args = enqueued_job["arguments"].first
+        assert_nil args["backfill_target"]
+      end
+    end
+
+    test "skips polling relay with completed polling backfill" do
+      filter_hash = SyncState.compute_filter_hash(direction: "down", filter: {})
+      SyncState.create!(
+        relay_url: @polling_relay.url,
+        filter_hash:,
+        direction: "down",
+        status: "completed",
+        backfill_target: 1.month.ago,
+        backfill_until: 30.minutes.ago, # Caught up
+        events_downloaded: 1000,
+        events_uploaded: 0
+      )
+
+      with_fake_configuration(backfill: [ @polling_relay ]) do
+        assert_no_enqueued_jobs only: Sync::PollingJob do
+          result = DispatchSyncJobs.call(mode: "backfill")
+          assert_equal 0, result.value![:dispatched]
+        end
       end
     end
   end

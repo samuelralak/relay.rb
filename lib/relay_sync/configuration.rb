@@ -116,7 +116,8 @@ module RelaySync
     class SyncSettings
       attr_reader :batch_size, :max_concurrent_connections, :reconnect_delay_seconds,
                   :max_reconnect_attempts, :backfill_since_hours, :event_kinds,
-                  :negentropy_frame_size, :negentropy_chunk_hours, :upload_batch_size, :upload_delay_ms,
+                  :negentropy_frame_size, :negentropy_chunk_hours, :polling_chunk_hours,
+                  :upload_batch_size, :upload_delay_ms,
                   :resume_overlap_seconds, :checkpoint_interval,
                   :polling_window_minutes, :polling_timeout_seconds,
                   :stale_threshold_minutes, :error_retry_after_minutes
@@ -130,6 +131,7 @@ module RelaySync
         @event_kinds = config.fetch(:event_kinds, [ 0, 1, 3, 5, 6, 7 ])
         @negentropy_frame_size = config.fetch(:negentropy_frame_size, 60_000)
         @negentropy_chunk_hours = config.fetch(:negentropy_chunk_hours, 168) # 1 week default
+        @polling_chunk_hours = config.fetch(:polling_chunk_hours, 168) # 1 week default
         @upload_batch_size = config.fetch(:upload_batch_size, 50)
         @upload_delay_ms = config.fetch(:upload_delay_ms, 100)
         # Robustness settings
@@ -150,6 +152,7 @@ module RelaySync
         raise ConfigurationError, "batch_size must be positive" if @batch_size <= 0
         raise ConfigurationError, "backfill_since_hours must be positive" if @backfill_since_hours <= 0
         raise ConfigurationError, "negentropy_chunk_hours must be positive" if @negentropy_chunk_hours <= 0
+        raise ConfigurationError, "polling_chunk_hours must be positive" if @polling_chunk_hours <= 0
         raise ConfigurationError, "stale_threshold_minutes must be positive" if @stale_threshold_minutes <= 0
         raise ConfigurationError, "polling_timeout_seconds must be positive" if @polling_timeout_seconds <= 0
       end
@@ -174,6 +177,8 @@ module RelaySync
           backfill_since_hours:,
           event_kinds:,
           negentropy_frame_size:,
+          negentropy_chunk_hours:,
+          polling_chunk_hours:,
           upload_batch_size:,
           upload_delay_ms:,
           resume_overlap_seconds:,

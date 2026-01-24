@@ -55,5 +55,62 @@ module SyncStates
       completed_duration = Time.current - backfill_until
       ((completed_duration / total_duration) * 100).round(1)
     end
+
+    # -------------------------------------------------------------------------
+    # Polling Backfill (forward direction: target → now)
+    # Used by PollingJob for non-negentropy relays
+    # -------------------------------------------------------------------------
+
+    # Initialize polling backfill (forward direction).
+    # @param from [Time] the oldest timestamp to start backfilling from
+    def initialize_polling_backfill!(from:)
+      return if backfill_target.present? # Already initialized
+
+      update!(
+        backfill_target: from,  # The oldest point (where we started)
+        backfill_until: from    # Current progress (starts at oldest, moves forward)
+      )
+    end
+
+    # Get next chunk moving FORWARD in time.
+    # @param chunk_hours [Integer] size of each chunk in hours
+    # @return [Hash] { since:, until: } or nil if backfill complete
+    def next_polling_backfill_chunk(chunk_hours:)
+      return nil if polling_backfill_complete?
+
+      chunk_start = backfill_until
+      return nil unless chunk_start
+
+      chunk_end = chunk_start + chunk_hours.hours
+      # Cap at current time (don't request future events)
+      chunk_end = Time.current if chunk_end > Time.current
+
+      { since: chunk_start.to_i, until: chunk_end.to_i }
+    end
+
+    # Mark a polling backfill chunk as completed.
+    # @param chunk_end [Time] the end time of the completed chunk
+    def mark_polling_chunk_completed!(chunk_end:)
+      update!(backfill_until: chunk_end)
+    end
+
+    # Check if polling backfill has caught up to current time.
+    # Uses 1-hour buffer to account for clock differences and processing time.
+    def polling_backfill_complete?
+      return false unless backfill_target && backfill_until
+      backfill_until >= Time.current - 1.hour
+    end
+
+    # Progress percentage for polling backfill.
+    def polling_backfill_progress_percent
+      return 100 if polling_backfill_complete?
+      return 0 unless backfill_target && backfill_until
+
+      total = Time.current - backfill_target
+      return 0 if total <= 0 # Guard against division by zero
+
+      completed = backfill_until - backfill_target
+      ((completed / total) * 100).round(1)
+    end
   end
 end

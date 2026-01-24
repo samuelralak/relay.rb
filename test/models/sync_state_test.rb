@@ -580,4 +580,118 @@ class SyncStateTest < ActiveSupport::TestCase
     # Should be approximately 50% (may vary slightly due to timing)
     assert_in_delta 50, progress, 1
   end
+
+  # =========================================================================
+  # Polling Backfill Tracking (forward direction)
+  # =========================================================================
+
+  test "initialize_polling_backfill! sets target and until to same value" do
+    @sync_state.save!
+    target = 1.month.ago
+
+    @sync_state.initialize_polling_backfill!(from: target)
+
+    assert_equal target.to_i, @sync_state.backfill_target.to_i
+    assert_equal target.to_i, @sync_state.backfill_until.to_i
+  end
+
+  test "initialize_polling_backfill! does nothing if already initialized" do
+    @sync_state.save!
+    original = 1.month.ago
+    @sync_state.update!(backfill_target: original, backfill_until: original)
+
+    @sync_state.initialize_polling_backfill!(from: 2.months.ago)
+
+    assert_equal original.to_i, @sync_state.backfill_target.to_i
+  end
+
+  test "next_polling_backfill_chunk returns correct forward window" do
+    @sync_state.save!
+    target = 30.days.ago
+    @sync_state.update!(backfill_target: target, backfill_until: target)
+
+    chunk = @sync_state.next_polling_backfill_chunk(chunk_hours: 168) # 1 week
+
+    assert_kind_of Hash, chunk
+    assert_equal target.to_i, chunk[:since]
+    assert_equal (target + 168.hours).to_i, chunk[:until]
+  end
+
+  test "next_polling_backfill_chunk caps at current time" do
+    @sync_state.save!
+    target = 3.days.ago
+    @sync_state.update!(backfill_target: target, backfill_until: target)
+
+    chunk = @sync_state.next_polling_backfill_chunk(chunk_hours: 168) # 1 week
+
+    # Should cap at current time, not go 7 days into future
+    assert chunk[:until] <= Time.current.to_i + 1
+  end
+
+  test "next_polling_backfill_chunk returns nil when complete" do
+    @sync_state.save!
+    @sync_state.update!(backfill_target: 1.month.ago, backfill_until: 30.minutes.ago)
+
+    chunk = @sync_state.next_polling_backfill_chunk(chunk_hours: 168)
+
+    assert_nil chunk
+  end
+
+  test "mark_polling_chunk_completed! moves backfill_until forward" do
+    @sync_state.save!
+    target = 1.month.ago
+    @sync_state.update!(backfill_target: target, backfill_until: target)
+
+    new_until = target + 1.week
+    @sync_state.mark_polling_chunk_completed!(chunk_end: new_until)
+
+    assert_equal new_until.to_i, @sync_state.backfill_until.to_i
+  end
+
+  test "polling_backfill_complete? returns true when caught up" do
+    @sync_state.save!
+    @sync_state.update!(backfill_target: 1.month.ago, backfill_until: 30.minutes.ago)
+
+    assert @sync_state.polling_backfill_complete?
+  end
+
+  test "polling_backfill_complete? returns false when not caught up" do
+    @sync_state.save!
+    @sync_state.update!(backfill_target: 1.month.ago, backfill_until: 1.week.ago)
+
+    assert_not @sync_state.polling_backfill_complete?
+  end
+
+  test "polling_backfill_complete? returns false when not initialized" do
+    @sync_state.backfill_target = nil
+    @sync_state.backfill_until = nil
+
+    assert_not @sync_state.polling_backfill_complete?
+  end
+
+  test "polling_backfill_progress_percent calculates correctly" do
+    @sync_state.save!
+    # Target 10 days ago, until 5 days ago = ~50%
+    target = 10.days.ago
+    until_time = 5.days.ago
+    @sync_state.update!(backfill_target: target, backfill_until: until_time)
+
+    progress = @sync_state.polling_backfill_progress_percent
+
+    assert_in_delta 50, progress, 5
+  end
+
+  test "polling_backfill_progress_percent returns 100 when complete" do
+    @sync_state.save!
+    @sync_state.update!(backfill_target: 1.month.ago, backfill_until: 30.minutes.ago)
+
+    assert_equal 100, @sync_state.polling_backfill_progress_percent
+  end
+
+  test "polling_backfill_progress_percent returns 0 when not initialized" do
+    @sync_state.backfill_target = nil
+    @sync_state.backfill_until = nil
+
+    assert_equal 0, @sync_state.polling_backfill_progress_percent
+  end
 end
