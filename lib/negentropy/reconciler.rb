@@ -33,14 +33,13 @@ module Negentropy
       lower = Bound.min
       upper = Bound.max
 
-      if storage.empty?
-        message.add_skip(upper)
-      else
-        fingerprint = storage.fingerprint(lower, upper)
-        message.add_fingerprint(upper, fingerprint)
-      end
+      # Always send FINGERPRINT for the full range, even if storage is empty.
+      # SKIP is an acknowledgment in response, not for initiation.
+      # Empty storage produces an all-zeros fingerprint.
+      fingerprint = storage.fingerprint(lower, upper)
+      message.add_fingerprint(upper, fingerprint)
 
-      @pending_ranges = [[lower, upper]]
+      @pending_ranges = [ [ lower, upper ] ]
       message.to_hex
     end
 
@@ -65,7 +64,7 @@ module Negentropy
       # Handle empty message as implicit "skip to end" (remote has nothing)
       ranges = incoming.ranges
       if ranges.empty?
-        ranges = [Message::Range.new(upper_bound: Bound.max, mode: Message::Mode::SKIP, payload: nil)]
+        ranges = [ Message::Range.new(upper_bound: Bound.max, mode: Message::Mode::SKIP, payload: nil) ]
       end
 
       ranges.each do |range|
@@ -74,7 +73,7 @@ module Negentropy
         # Check if we're approaching frame size limit
         if current_size > frame_size_limit - FRAME_SIZE_MARGIN
           # Defer remaining ranges to next round
-          new_pending << [lower, Bound.max]
+          new_pending << [ lower, Bound.max ]
           break
         end
 
@@ -131,7 +130,7 @@ module Negentropy
       complete = new_pending.empty? && (response.empty? || response.ranges.all?(&:skip?))
 
       if complete
-        [nil, have_ids, need_ids]
+        [ nil, have_ids, need_ids ]
       else
         # If we have pending ranges but empty/all-skip response, compact the skips
         # and append fingerprints to preserve alignment and continue reconciliation.
@@ -167,15 +166,16 @@ module Negentropy
             estimate_prev_timestamp = upper_bound.timestamp unless upper_bound.infinity?
           end
 
-          if current_size > frame_size_limit
-            Rails.logger.warn(
-              "[Negentropy::Reconciler] Response exceeds frame size limit " \
-              "(#{current_size} > #{frame_size_limit})"
-            )
-          end
+          # Frame size exceeded - advisory warning (logged by caller if needed)
+          @frame_size_exceeded = current_size > frame_size_limit
         end
-        [response.to_hex, have_ids, need_ids]
+        [ response.to_hex, have_ids, need_ids ]
       end
+    end
+
+    # Check if last response exceeded frame size limit
+    def frame_size_exceeded?
+      @frame_size_exceeded || false
     end
 
     private
@@ -198,19 +198,19 @@ module Negentropy
         # Lower half
         lower_fp = storage.fingerprint(lower, midpoint)
         response.add_fingerprint(midpoint, lower_fp)
-        new_pending << [lower, midpoint]
+        new_pending << [ lower, midpoint ]
         current_size += estimate_fingerprint_size(midpoint, estimate_prev_timestamp)
         estimate_prev_timestamp = midpoint.timestamp unless midpoint.infinity?
 
         # Upper half
         upper_fp = storage.fingerprint(midpoint, upper)
         response.add_fingerprint(upper, upper_fp)
-        new_pending << [midpoint, upper]
+        new_pending << [ midpoint, upper ]
         current_size += estimate_fingerprint_size(upper, estimate_prev_timestamp)
         estimate_prev_timestamp = upper.timestamp unless upper.infinity?
       end
 
-      [current_size, estimate_prev_timestamp]
+      [ current_size, estimate_prev_timestamp ]
     end
 
     # Estimate size of a skip range in bytes
@@ -254,5 +254,4 @@ module Negentropy
       5
     end
   end
-
 end

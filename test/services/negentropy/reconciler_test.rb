@@ -17,13 +17,15 @@ module Negentropy
       message_hex = reconciler.initiate
 
       message = Message.from_hex(message_hex)
-      # Trailing skips are optimized away per protocol spec
-      # Empty storage produces a skip which is optimized to empty message
-      assert_equal 0, message.size
+      # Per protocol design: always send FINGERPRINT for initiation, even if storage is empty
+      # SKIP is an acknowledgment in response, not for initiation
+      # Empty storage produces an all-zeros fingerprint
+      assert_equal 1, message.size
+      assert message.ranges.first.fingerprint?
     end
 
     test "initiate with items sends fingerprint" do
-      storage = create_storage_with_events([100, 200, 300])
+      storage = create_storage_with_events([ 100, 200, 300 ])
 
       reconciler = Reconciler.new(storage: storage)
       message_hex = reconciler.initiate
@@ -35,11 +37,11 @@ module Negentropy
 
     test "reconcile matching fingerprints returns complete" do
       # Both sides have same events
-      storage1 = create_storage_with_events([100, 200])
-      storage2 = create_storage_with_events([100, 200])
+      storage1 = create_storage_with_events([ 100, 200 ])
+      storage2 = create_storage_with_events([ 100, 200 ])
 
-      client = Negentropy::ClientReconciler.new(storage: storage1)
-      server = Negentropy::ServerReconciler.new(storage: storage2)
+      client = Negentropy::Reconciler::Client.new(storage: storage1)
+      server = Negentropy::Reconciler::Server.new(storage: storage2)
 
       # Client initiates
       initial_msg = client.initiate
@@ -56,11 +58,11 @@ module Negentropy
 
     test "reconcile finds missing events on client" do
       # Server has more events
-      storage1 = create_storage_with_events([100])
-      storage2 = create_storage_with_events([100, 200])
+      storage1 = create_storage_with_events([ 100 ])
+      storage2 = create_storage_with_events([ 100, 200 ])
 
-      client = Negentropy::ClientReconciler.new(storage: storage1)
-      server = Negentropy::ServerReconciler.new(storage: storage2)
+      client = Negentropy::Reconciler::Client.new(storage: storage1)
+      server = Negentropy::Reconciler::Server.new(storage: storage2)
 
       # Run reconciliation
       initial_msg = client.initiate
@@ -81,11 +83,11 @@ module Negentropy
 
     test "reconcile finds missing events on server" do
       # Client has more events
-      storage1 = create_storage_with_events([100, 200])
-      storage2 = create_storage_with_events([100])
+      storage1 = create_storage_with_events([ 100, 200 ])
+      storage2 = create_storage_with_events([ 100 ])
 
-      client = Negentropy::ClientReconciler.new(storage: storage1)
-      server = Negentropy::ServerReconciler.new(storage: storage2)
+      client = Negentropy::Reconciler::Client.new(storage: storage1)
+      server = Negentropy::Reconciler::Server.new(storage: storage2)
 
       # Run reconciliation
       initial_msg = client.initiate
@@ -103,11 +105,11 @@ module Negentropy
 
     test "complete reconciliation loop" do
       # Create storages with some overlap
-      storage1 = create_storage_with_ids(["a" * 64, "b" * 64])
-      storage2 = create_storage_with_ids(["b" * 64, "c" * 64])
+      storage1 = create_storage_with_ids([ "a" * 64, "b" * 64 ])
+      storage2 = create_storage_with_ids([ "b" * 64, "c" * 64 ])
 
-      client = Negentropy::ClientReconciler.new(storage: storage1)
-      server = Negentropy::ServerReconciler.new(storage: storage2)
+      client = Negentropy::Reconciler::Client.new(storage: storage1)
+      server = Negentropy::Reconciler::Server.new(storage: storage2)
 
       all_client_have = []
       all_client_need = []
@@ -147,26 +149,37 @@ module Negentropy
     test "handles empty vs populated storage" do
       storage1 = Storage.new
       storage1.seal
-      storage2 = create_storage_with_events([100, 200])
+      storage2 = create_storage_with_events([ 100, 200 ])
 
-      client = Negentropy::ClientReconciler.new(storage: storage1)
-      server = Negentropy::ServerReconciler.new(storage: storage2)
+      client = Negentropy::Reconciler::Client.new(storage: storage1)
+      server = Negentropy::Reconciler::Server.new(storage: storage2)
 
+      # Client with empty storage sends fingerprint (all zeros)
       initial_msg = client.initiate
       response_hex, server_have, server_need = server.process_request(initial_msg)
 
-      # Server has all events, client has none
-      assert_equal 2, server_have.size
+      # Server responds with ID_LIST containing its 2 events
+      # have_ids is populated when client processes the response and compares
+      assert response_hex, "Server should respond to fingerprint mismatch"
+      response = Message.from_hex(response_hex)
+      assert response.ranges.any?(&:id_list?), "Server should send ID list for small mismatch"
+
+      # Client processes response to identify what it needs
+      _next_msg, client_have, client_need = client.process_response(response_hex)
+
+      # Client should identify it needs the 2 events from server
+      assert_equal 2, client_need.size
+      assert_empty client_have
       assert_empty server_need
     end
 
     test "handles populated vs empty storage" do
-      storage1 = create_storage_with_events([100, 200])
+      storage1 = create_storage_with_events([ 100, 200 ])
       storage2 = Storage.new
       storage2.seal
 
-      client = Negentropy::ClientReconciler.new(storage: storage1)
-      server = Negentropy::ServerReconciler.new(storage: storage2)
+      client = Negentropy::Reconciler::Client.new(storage: storage1)
+      server = Negentropy::Reconciler::Server.new(storage: storage2)
 
       initial_msg = client.initiate
       response_hex, server_have, server_need = server.process_request(initial_msg)

@@ -61,7 +61,7 @@ module Negentropy
     end
 
     test "roundtrip encoding" do
-      [0, 1, 127, 128, 255, 16383, 16384, 100_000, 1_000_000].each do |n|
+      [ 0, 1, 127, 128, 255, 16383, 16384, 100_000, 1_000_000 ].each do |n|
         encoded = Varint.encode(n)
         decoded, = Varint.decode(encoded)
         assert_equal n, decoded, "Roundtrip failed for #{n}"

@@ -12,14 +12,14 @@ module Negentropy
 
     test "computes fingerprint for single ID" do
       id = "\x01" * 32
-      fp = Fingerprint.compute([id])
+      fp = Fingerprint.compute([ id ])
 
       assert_equal 16, fp.bytesize
       assert_not Fingerprint.empty?(fp)
     end
 
     test "computes fingerprint for multiple IDs" do
-      ids = ["\x01" * 32, "\x02" * 32, "\x03" * 32]
+      ids = [ "\x01" * 32, "\x02" * 32, "\x03" * 32 ]
       fp = Fingerprint.compute(ids)
 
       assert_equal 16, fp.bytesize
@@ -27,14 +27,14 @@ module Negentropy
     end
 
     test "computes from hex IDs" do
-      hex_ids = ["a" * 64, "b" * 64]
+      hex_ids = [ "a" * 64, "b" * 64 ]
       fp = Fingerprint.compute_from_hex(hex_ids)
 
       assert_equal 16, fp.bytesize
     end
 
     test "same IDs produce same fingerprint" do
-      ids = ["\x01" * 32, "\x02" * 32]
+      ids = [ "\x01" * 32, "\x02" * 32 ]
       fp1 = Fingerprint.compute(ids)
       fp2 = Fingerprint.compute(ids)
 
@@ -42,8 +42,8 @@ module Negentropy
     end
 
     test "different IDs produce different fingerprints" do
-      ids1 = ["\x01" * 32]
-      ids2 = ["\x02" * 32]
+      ids1 = [ "\x01" * 32 ]
+      ids2 = [ "\x02" * 32 ]
 
       fp1 = Fingerprint.compute(ids1)
       fp2 = Fingerprint.compute(ids2)
@@ -52,8 +52,8 @@ module Negentropy
     end
 
     test "order affects fingerprint" do
-      ids1 = ["\x01" * 32, "\x02" * 32]
-      ids2 = ["\x02" * 32, "\x01" * 32]
+      ids1 = [ "\x01" * 32, "\x02" * 32 ]
+      ids2 = [ "\x02" * 32, "\x01" * 32 ]
 
       # Sum is commutative, so same fingerprint
       fp1 = Fingerprint.compute(ids1)
@@ -64,7 +64,7 @@ module Negentropy
     end
 
     test "to_hex and from_hex roundtrip" do
-      fp = Fingerprint.compute(["\x01" * 32])
+      fp = Fingerprint.compute([ "\x01" * 32 ])
       hex = Fingerprint.to_hex(fp)
       parsed = Fingerprint.from_hex(hex)
 

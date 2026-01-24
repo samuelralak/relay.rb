@@ -44,7 +44,7 @@ module Negentropy
     # @param hex_ids [Array<String>] array of 64-char hex event IDs
     # @return [String] 16-byte binary fingerprint
     def compute_from_hex(hex_ids)
-      binary_ids = hex_ids.map { |hex| [hex].pack("H*") }
+      binary_ids = hex_ids.map { |hex| [ hex ].pack("H*") }
       compute(binary_ids)
     end
 
@@ -88,7 +88,7 @@ module Negentropy
     # @param hex [String] 32-char hex string
     # @return [String] 16-byte binary fingerprint
     def from_hex(hex)
-      [hex].pack("H*")
+      [ hex ].pack("H*")
     end
   end
 end

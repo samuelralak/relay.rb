@@ -23,7 +23,7 @@ module Negentropy
       def self.from_event(event)
         timestamp = event.is_a?(Hash) ? event[:created_at] : event.nostr_created_at.to_i
         hex_id = event.is_a?(Hash) ? event[:id] : event.event_id
-        binary_id = [hex_id].pack("H*")
+        binary_id = [ hex_id ].pack("H*")
         new(timestamp: timestamp, id: binary_id)
       end
     end
@@ -36,7 +36,7 @@ module Negentropy
     end
 
     # Add an event to the storage
-    # @param event [Event, Hash] event to add
+    # @param event [Object, Hash] event to add
     def add(event)
       raise "Storage is sealed" if @sealed
 
@@ -44,7 +44,7 @@ module Negentropy
     end
 
     # Add multiple events
-    # @param events [Array<Event, Hash>] events to add
+    # @param events [Array<Object, Hash>] events to add
     def add_all(events)
       events.each { |e| add(e) }
     end
@@ -144,32 +144,34 @@ module Negentropy
     # @return [Array<Integer, Integer>] [start_idx, end_idx]
     def range_indices(lower, upper)
       start_idx = find_lower_bound(lower)
-      return [start_idx, start_idx] if start_idx >= @items.size
+      return [ start_idx, start_idx ] if start_idx >= @items.size
 
       end_idx = find_lower_bound(upper)
-      [start_idx, end_idx]
+      [ start_idx, end_idx ]
     end
 
-    # Create from ActiveRecord scope
-    # @param scope [ActiveRecord::Relation] events scope
-    # @return [Storage] new storage with events loaded
-    def self.from_scope(scope)
-      storage = new
-      scope.find_each do |event|
-        storage.add(event)
+    class << self
+      # Create from ActiveRecord scope
+      # @param scope [ActiveRecord::Relation] events scope
+      # @return [Storage] new storage with events loaded
+      def from_scope(scope)
+        storage = new
+        scope.find_each do |event|
+          storage.add(event)
+        end
+        storage.seal
+        storage
       end
-      storage.seal
-      storage
-    end
 
-    # Create from array of events
-    # @param events [Array<Event, Hash>] events
-    # @return [Storage] new storage with events loaded
-    def self.from_array(events)
-      storage = new
-      storage.add_all(events)
-      storage.seal
-      storage
+      # Create from array of events
+      # @param events [Array<Object, Hash>] events
+      # @return [Storage] new storage with events loaded
+      def from_array(events)
+        storage = new
+        storage.add_all(events)
+        storage.seal
+        storage
+      end
     end
   end
 end

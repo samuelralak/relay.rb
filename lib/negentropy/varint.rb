@@ -52,7 +52,7 @@ module Negentropy
         raise ArgumentError, "Varint too long" if bytes_read > 10
       end
 
-      [value, bytes_read]
+      [ value, bytes_read ]
     end
 
     # Decode varint from a StringIO-like object

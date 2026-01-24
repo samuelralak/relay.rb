@@ -34,7 +34,7 @@ module Negentropy
     test "add id_list range" do
       message = Message.new
       upper = Bound.new(100, "")
-      ids = ["\x01" * 32, "\x02" * 32]
+      ids = [ "\x01" * 32, "\x02" * 32 ]
       message.add_id_list(upper, ids)
 
       assert_equal 1, message.size
@@ -69,7 +69,7 @@ module Negentropy
 
     test "encode and decode id_list message" do
       message = Message.new
-      ids = ["\x01" * 32, "\x02" * 32, "\x03" * 32]
+      ids = [ "\x01" * 32, "\x02" * 32, "\x03" * 32 ]
       message.add_id_list(Bound.max, ids)
 
       encoded = message.encode

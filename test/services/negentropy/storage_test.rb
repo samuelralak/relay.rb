@@ -41,7 +41,7 @@ module Negentropy
     end
 
     test "range queries" do
-      add_events([100, 200, 300])
+      add_events([ 100, 200, 300 ])
 
       lower = Bound.new(150, "")
       upper = Bound.new(250, "")
@@ -52,7 +52,7 @@ module Negentropy
     end
 
     test "fingerprint for range" do
-      add_events([100, 200, 300])
+      add_events([ 100, 200, 300 ])
 
       lower = Bound.min
       upper = Bound.max
@@ -63,7 +63,7 @@ module Negentropy
     end
 
     test "midpoint" do
-      add_events([100, 200, 300, 400])
+      add_events([ 100, 200, 300, 400 ])
 
       lower = Bound.min
       upper = Bound.max

@@ -23,7 +23,7 @@ module Negentropy
       bound = Bound.from_event(event)
 
       assert_equal 1000, bound.timestamp
-      assert_equal ["a" * 64].pack("H*"), bound.id
+      assert_equal [ "a" * 64 ].pack("H*"), bound.id
       assert_equal "a" * 64, bound.id_hex
     end
 
@@ -102,7 +102,7 @@ module Negentropy
 
     test "id_hex returns hex representation" do
       hex_id = "ab" * 32
-      binary_id = [hex_id].pack("H*")
+      binary_id = [ hex_id ].pack("H*")
       bound = Bound.new(100, binary_id)
 
       assert_equal hex_id, bound.id_hex

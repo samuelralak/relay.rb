@@ -29,12 +29,12 @@ module Negentropy
     end
 
     # Create a bound from an event
-    # @param event [Event, Hash] event with nostr_created_at and event_id
+    # @param event [Object, Hash] event with created_at/nostr_created_at and id/event_id
     def self.from_event(event)
       timestamp = event.is_a?(Hash) ? event[:created_at] : event.nostr_created_at.to_i
       id = event.is_a?(Hash) ? event[:id] : event.event_id
       # Convert hex ID to binary
-      binary_id = [id].pack("H*")
+      binary_id = [ id ].pack("H*")
       new(timestamp, binary_id)
     end
 
@@ -120,7 +120,7 @@ module Negentropy
     end
 
     def hash
-      [timestamp, id].hash
+      [ timestamp, id ].hash
     end
 
     alias eql? ==

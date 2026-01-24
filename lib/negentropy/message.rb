@@ -148,7 +148,7 @@ module Negentropy
     # @param hex [String] hex-encoded message
     # @return [Message] decoded message
     def self.from_hex(hex)
-      decode([hex].pack("H*"))
+      decode([ hex ].pack("H*"))
     end
 
     def empty?
