@@ -28,7 +28,7 @@ class Event < ApplicationRecord
                                    greater_than_or_equal_to: 0,
                                    less_than_or_equal_to: 65_535 }
 
-  validates :tags, presence: true
+  validate :tags_is_array  # Empty tags [] is valid in Nostr, but must be an array
   validates :content, presence: true, allow_blank: true
 
   validates :sig, presence: true,
@@ -37,4 +37,10 @@ class Event < ApplicationRecord
 
   validates :raw_event, presence: true
   validates :first_seen_at, presence: true
+
+  private
+
+  def tags_is_array
+    errors.add(:tags, "must be an array") unless tags.is_a?(Array)
+  end
 end

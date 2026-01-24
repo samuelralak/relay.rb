@@ -64,12 +64,25 @@ class EventTest < ActiveSupport::TestCase
     end
   end
 
-  test "nostr_created_at, tags, and raw_event are required" do
+  test "nostr_created_at and raw_event are required" do
     event = Event.new
     assert_not event.valid?
-    %i[nostr_created_at tags raw_event].each do |attr|
+    # Note: tags has DB default [] so it's always a valid array
+    %i[nostr_created_at raw_event].each do |attr|
       assert event.errors[attr].any?, "Expected error on #{attr}"
     end
+  end
+
+  test "tags must be an array" do
+    # Test nil tags (before_validation callbacks may run on reload, so test directly)
+    event = Event.new(build_event_attrs(tags: nil))
+    event.tags = nil  # Force nil after attrs set
+    assert_not event.valid?
+    assert event.errors[:tags].any?, "Expected error on tags when nil"
+
+    # Empty array is valid per Nostr spec
+    @text_note.tags = []
+    assert_valid @text_note
   end
 
   test "content can be blank" do
