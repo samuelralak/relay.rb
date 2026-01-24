@@ -1,10 +1,9 @@
 # frozen_string_literal: true
 
 class EventTag < ApplicationRecord
+  include SoftDeletable
   include EventTags::Queryable
   include EventTags::Identifiable
-
-  acts_as_paranoid
 
   # Associations
   belongs_to :event, inverse_of: :event_tags

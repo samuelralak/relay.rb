@@ -1,12 +1,11 @@
 # frozen_string_literal: true
 
 class Event < ApplicationRecord
+  include SoftDeletable
   include Events::Classifiable
   include Events::Expirable
   include Events::Taggable
   include Events::Filterable
-
-  acts_as_paranoid
 
   # Associations
   has_many :event_tags, dependent: :delete_all, inverse_of: :event
