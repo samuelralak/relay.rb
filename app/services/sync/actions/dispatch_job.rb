@@ -32,7 +32,7 @@ module Sync
 
       def dispatch_download_job
         if relay.negentropy?
-          NegentropySyncJob.perform_later(
+          Sync::NegentropyJob.perform_later(
             relay_url: relay.url,
             filter: {},
             direction: relay.direction,
@@ -41,7 +41,7 @@ module Sync
           )
         else
           filter = mode == RelaySync::SyncMode::FULL ? {} : backfill_filter
-          PollingSyncJob.perform_later(
+          Sync::PollingJob.perform_later(
             relay_url: relay.url,
             filter:,
             mode:
@@ -50,7 +50,7 @@ module Sync
       end
 
       def dispatch_realtime_job
-        PollingSyncJob.perform_later(
+        Sync::PollingJob.perform_later(
           relay_url: relay.url,
           filter: realtime_filter,
           mode: RelaySync::SyncMode::REALTIME
@@ -58,7 +58,7 @@ module Sync
       end
 
       def dispatch_upload_job
-        UploadSyncJob.perform_later(relay_url: relay.url)
+        Sync::UploadJob.perform_later(relay_url: relay.url)
       end
 
       def already_syncing?

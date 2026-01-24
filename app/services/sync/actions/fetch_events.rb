@@ -3,7 +3,7 @@
 module Sync
   module Actions
     # Fetches events from a relay by their IDs in batches.
-    # Queues ProcessEventJob for each received event.
+    # Queues Events::ProcessJob for each received event.
     class FetchEvents < BaseService
       include TimeoutWaitable
 
@@ -50,7 +50,7 @@ module Sync
           @counter_mutex.synchronize do @fetched_count += 1 end
           batch_mutex.synchronize do batch_fetched += 1 end
           # Queue event for processing
-          ProcessEventJob.perform_later(event_data.to_json, conn.url)
+          Events::ProcessJob.perform_later(event_data.to_json, conn.url)
         end
 
         RelaySync.manager.register_eose_handler(sub_id) do

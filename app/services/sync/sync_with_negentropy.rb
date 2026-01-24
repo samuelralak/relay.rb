@@ -79,7 +79,7 @@ module Sync
 
         process_sync_results
         # Reset to idle - this service doesn't track backfill state
-        # The calling job (NegentropySyncJob) manages completed status when backfill is done
+        # The calling job (Sync::NegentropyJob) manages completed status when backfill is done
         sync_state.reset_to_idle! if manage_status
       ensure
         RelaySync.manager.unregister_neg_handler(subscription_id)

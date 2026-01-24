@@ -3,7 +3,7 @@
 module Sync
   # Facade that combines stale recovery and error retry.
   # Maintains backward compatibility with existing callers.
-  # Called by StaleSyncRecoveryJob (recurring) or manually via rake tasks
+  # Called by Sync::RecoveryJob (recurring) or manually via rake tasks
   class RecoverStale < BaseService
     option :stale_threshold, type: Types::Integer.optional, default: -> { nil }
     option :error_retry_after, type: Types::Integer.optional, default: -> { nil }

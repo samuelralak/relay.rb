@@ -98,7 +98,7 @@ class SyncStatusSemanticsTest < ActiveSupport::TestCase
   # =========================================
 
   test "polling sync should use idle, not completed" do
-    # Simulate what PollingSyncJob does
+    # Simulate what Sync::PollingJob does
     state = create_sync_state(status: "idle")
 
     # Start polling
@@ -140,7 +140,7 @@ class SyncStatusSemanticsTest < ActiveSupport::TestCase
   # =========================================
 
   test "negentropy sync marks completed only when backfill done" do
-    # Simulate NegentropySyncJob behavior
+    # Simulate Sync::NegentropyJob behavior
     state = create_sync_state(
       status: "idle",
       backfill_target: 5.years.ago,
@@ -169,7 +169,7 @@ class SyncStatusSemanticsTest < ActiveSupport::TestCase
   test "negentropy error resets to idle for fallback" do
     state = create_sync_state(status: "syncing")
 
-    # NegentropyError occurs - reset to idle so PollingSyncJob can take over
+    # NegentropyError occurs - reset to idle so Sync::PollingJob can take over
     state.reset_to_idle!
 
     assert_equal "idle", state.status

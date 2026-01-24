@@ -2,7 +2,7 @@
 
 module Sync
   # Dispatches sync jobs based on mode and relay configuration.
-  # Called by SyncOrchestratorJob (recurring) or manually via rake tasks.
+  # Called by Sync::OrchestratorJob (recurring) or manually via rake tasks.
   class DispatchSyncJobs < BaseService
     option :mode, type: RelaySync::Types::SyncMode
     option :relay_url, type: Types::RelayUrl.optional, default: -> { nil }

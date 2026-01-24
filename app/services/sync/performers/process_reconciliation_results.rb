@@ -42,7 +42,7 @@ module Sync
         events = Event.where(event_id: have_ids).active
         return unless events.any?
 
-        UploadEventsJob.perform_later(
+        Events::UploadJob.perform_later(
           relay_url:,
           record_ids: events.pluck(:id)
         )

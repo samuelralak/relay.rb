@@ -65,7 +65,7 @@ class SyncOrchestrationTest < ActiveSupport::TestCase
 
     # Active syncing state: orchestration skips
     with_relays(backfill: [ relay ]) do
-      SyncOrchestratorJob.new.perform(mode: "backfill")
+      Sync::OrchestratorJob.new.perform(mode: "backfill")
       assert_empty enqueued_jobs, "Should skip actively syncing relay"
     end
 
@@ -73,13 +73,13 @@ class SyncOrchestrationTest < ActiveSupport::TestCase
     sync_state.update!(updated_at: 30.minutes.ago)
 
     # Recovery resets stale state
-    StaleSyncRecoveryJob.new.perform
+    Sync::RecoveryJob.new.perform
     sync_state.reload
     assert_equal "idle", sync_state.status
 
     # Now orchestration dispatches
     with_relays(backfill: [ relay ]) do
-      SyncOrchestratorJob.new.perform(mode: "backfill")
+      Sync::OrchestratorJob.new.perform(mode: "backfill")
       assert_equal 1, enqueued_jobs.size, "Should dispatch after recovery"
     end
   end
@@ -101,7 +101,7 @@ class SyncOrchestrationTest < ActiveSupport::TestCase
     )
 
     # Recovery clears error
-    StaleSyncRecoveryJob.new.perform
+    Sync::RecoveryJob.new.perform
 
     errored_state.reload
     assert_equal "idle", errored_state.status
@@ -109,7 +109,7 @@ class SyncOrchestrationTest < ActiveSupport::TestCase
 
     # Orchestration can now dispatch
     with_relays(backfill: [ relay ]) do
-      SyncOrchestratorJob.new.perform(mode: "backfill")
+      Sync::OrchestratorJob.new.perform(mode: "backfill")
       assert_equal 1, enqueued_jobs.size
     end
   end
