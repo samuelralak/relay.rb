@@ -1,15 +1,76 @@
-# examples:
-#   periodic_cleanup:
-#     class: CleanSoftDeletedRecordsJob
-#     queue: background
-#     args: [ 1000, { batch_size: 500 } ]
-#     schedule: every hour
-#   periodic_cleanup_with_command:
-#     command: "SoftDeletedRecord.due.delete_all"
-#     priority: 2
-#     schedule: at 5am every day
+# Sync orchestration recurring jobs
+# These replace the brittle rake task daemon with proper job-based orchestration
 
+# Production schedules - optimized for stability and efficiency
 production:
+  # Housekeeping - clear finished Solid Queue jobs
   clear_solid_queue_finished_jobs:
     command: "SolidQueue::Job.clear_finished_in_batches(sleep_between_batches: 0.3)"
     schedule: every hour at minute 12
+
+  # Real-time sync - polls all download relays for recent events
+  # Uses 15-minute window by default (configurable via polling_window_minutes)
+  realtime_sync:
+    class: SyncOrchestratorJob
+    args:
+      - mode: realtime
+    schedule: every 5 minutes
+
+  # Backfill sync - runs Negentropy/deep sync hourly
+  # Uses full backfill_since_hours window for historical sync
+  backfill_sync:
+    class: SyncOrchestratorJob
+    args:
+      - mode: backfill
+    schedule: every hour at minute 0
+
+  # Upload sync - uploads local events to upload-enabled relays
+  upload_sync:
+    class: SyncOrchestratorJob
+    args:
+      - mode: upload
+    schedule: every 15 minutes
+
+  # Stale sync recovery - handles interrupted syncs and retries errors
+  stale_sync_recovery:
+    class: StaleSyncRecoveryJob
+    schedule: every 10 minutes
+
+  # Full sync - comprehensive daily sync (off-peak hours)
+  # Compares entire local database against remote relays
+  full_sync:
+    class: SyncOrchestratorJob
+    args:
+      - mode: full
+    schedule: at 3am every day
+
+# Development schedules - more frequent for testing
+development:
+  # Real-time sync every 2 minutes
+  realtime_sync:
+    class: SyncOrchestratorJob
+    args:
+      - mode: realtime
+    schedule: every 2 minutes
+
+  # Backfill sync every 10 minutes
+  backfill_sync:
+    class: SyncOrchestratorJob
+    args:
+      - mode: backfill
+    schedule: every 10 minutes
+
+  # Upload sync every 5 minutes
+  upload_sync:
+    class: SyncOrchestratorJob
+    args:
+      - mode: upload
+    schedule: every 5 minutes
+
+  # Stale sync recovery every 5 minutes
+  stale_sync_recovery:
+    class: StaleSyncRecoveryJob
+    schedule: every 5 minutes
+
+# Test environment - no recurring jobs
+test: {}
