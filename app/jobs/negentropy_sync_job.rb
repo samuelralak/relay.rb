@@ -1,212 +1,207 @@
 # frozen_string_literal: true
 
 # Performs Negentropy (NIP-77) sync with a remote relay
+# Supports progressive chunked backfill to avoid "too many results" errors
 class NegentropySyncJob < ApplicationJob
-  queue_as :default
+  queue_as :sync
 
-  SYNC_TIMEOUT = 60 # seconds
-  FETCH_TIMEOUT = 10 # seconds per batch
+  # Retry on connection errors with exponential backoff
+  retry_on RelaySync::ConnectionError, wait: :polynomially_longer, attempts: 5
 
   # @param relay_url [String] URL of the relay to sync with
-  # @param filter [Hash] Nostr filter for events to sync
+  # @param filter [Hash] Nostr filter for events to sync (kinds, authors, etc.)
   # @param direction [String] sync direction (down, up, both)
-  def perform(relay_url:, filter: {}, direction: "down")
+  # @param backfill_target [Integer] Unix timestamp of oldest events to sync (e.g., 5 years ago)
+  # @param chunk_hours [Integer] Size of each sync chunk in hours
+  # @param continuation [Boolean] If true, this is a self-scheduled continuation (bypasses syncing check)
+  def perform(relay_url:, filter: {}, direction: "down", backfill_target: nil, chunk_hours: 168, continuation: false)
     @relay_url = relay_url
-    @filter = filter.symbolize_keys
     @direction = direction
-    @sync_state = find_or_create_sync_state
-    @have_ids = []
-    @need_ids = []
-    @mutex = Mutex.new
-    @condition = ConditionVariable.new
-    @complete = false
+    @base_filter = filter.symbolize_keys
+    @backfill_target = backfill_target ? Time.at(backfill_target) : 1.week.ago
+    @chunk_hours = chunk_hours
 
-    connection = RelaySync.manager.connection_for(relay_url)
-    unless connection&.connected?
-      Rails.logger.error "[NegentropySyncJob] Not connected to #{relay_url}"
-      @sync_state&.mark_error!("Not connected to relay")
+    # Find or create sync state for this relay/filter combination
+    @sync_state = find_or_create_sync_state
+
+    # Skip if already syncing and not stale (unless this is a continuation)
+    unless continuation
+      if @sync_state.syncing? && !@sync_state.stale?(threshold: stale_threshold)
+        Rails.logger.info "[NegentropySyncJob] Skipping #{relay_url} - already syncing"
+        @status_handled = true  # Don't reset - another job owns this status
+        return
+      end
+    end
+
+    # Check for stale sync (interrupted previous run)
+    if @sync_state.stale?(threshold: stale_threshold)
+      Rails.logger.warn "[NegentropySyncJob] Resuming stale sync for #{relay_url}"
+      @sync_state.reset_to_idle!
+    end
+
+    # Initialize backfill tracking if needed
+    @sync_state.initialize_backfill!(target: @backfill_target)
+
+    # Check if backfill is already complete
+    if @sync_state.backfill_complete?
+      Rails.logger.info "[NegentropySyncJob] Backfill complete for #{relay_url}"
+      # Ensure status reflects completion (might be stale "syncing" from crashed previous job)
+      @sync_state.mark_completed! unless @sync_state.completed?
+      @status_handled = true
       return
     end
 
-    Rails.logger.info "[NegentropySyncJob] Starting Negentropy sync with #{relay_url} (direction: #{direction})"
+    # Get the next chunk to sync (saved as instance var for error handler access)
+    @current_chunk = @sync_state.next_backfill_chunk(chunk_hours: @chunk_hours)
+    if @current_chunk.nil?
+      Rails.logger.info "[NegentropySyncJob] No more chunks to sync for #{relay_url}"
+      @sync_state.mark_completed!
+      @status_handled = true
+      return
+    end
+    effective_filter = @base_filter.merge(@current_chunk)
+
+    Rails.logger.info "[NegentropySyncJob] Starting sync with #{relay_url}"
+    Rails.logger.info "[NegentropySyncJob] Chunk: #{Time.at(@current_chunk[:since])} to #{Time.at(@current_chunk[:until])}"
+    Rails.logger.info "[NegentropySyncJob] Progress: #{@sync_state.backfill_progress_percent}% complete"
+
+    ensure_connection!(relay_url)
+
+    # Job manages status, not the service
     @sync_state.mark_syncing!
 
-    perform_sync(connection)
+    result = Sync::StartNegentropy.call(
+      relay_url: @relay_url,
+      filter: effective_filter,
+      direction: @direction,
+      manage_status: false
+    )
+
+    # Reload to get updated events_downloaded from StartNegentropy
+    @sync_state.reload
+
+    # Mark this chunk as completed
+    @sync_state.mark_backfill_chunk_completed!(chunk_start: Time.at(@current_chunk[:since]))
+
+    Rails.logger.info "[NegentropySyncJob] Chunk complete for #{relay_url}. " \
+                      "Have: #{result[:have_ids].size}, Need: #{result[:need_ids].size}"
+    Rails.logger.info "[NegentropySyncJob] Backfill progress: #{@sync_state.backfill_progress_percent}%"
+
+    # Schedule next chunk immediately if backfill not complete
+    if @sync_state.backfill_complete?
+      Rails.logger.info "[NegentropySyncJob] Backfill FULLY COMPLETE for #{relay_url}"
+      @sync_state.mark_completed!
+      @status_handled = true
+    else
+      # Keep status as syncing - the continuation job will bypass the syncing check
+      # This provides accurate status during multi-chunk backfill
+      Rails.logger.info "[NegentropySyncJob] Scheduling next chunk for #{relay_url}"
+      self.class.perform_later(
+        relay_url: relay_url,
+        filter: @base_filter,
+        direction: @direction,
+        backfill_target: @backfill_target.to_i,
+        chunk_hours: @chunk_hours,
+        continuation: true
+      )
+      @status_handled = true  # Status intentionally left as syncing for continuation
+    end
+  rescue RelaySync::SyncTimeoutError => e
+    Rails.logger.warn "[NegentropySyncJob] Timeout for #{relay_url}: #{e.message}"
+    @sync_state&.mark_error!(e.message)
+    @status_handled = true
+    # Don't retry immediately - let the stale recovery job handle it
+    # This avoids hammering a slow relay
+  rescue RelaySync::NegentropyError => e
+    Rails.logger.warn "[NegentropySyncJob] Negentropy error for #{relay_url}: #{e.message}"
+    Rails.logger.info "[NegentropySyncJob] Falling back to polling sync for current chunk"
+    @sync_state&.reset_to_idle!
+    @status_handled = true
+
+    # Fall back to polling sync with the same chunk time range
+    fallback_filter = if @current_chunk
+                        @base_filter.merge(@current_chunk)
+                      else
+                        @base_filter.merge(since: @backfill_target.to_i)
+                      end
+    PollingSyncJob.perform_later(
+      relay_url: relay_url,
+      filter: fallback_filter,
+      mode: "backfill"
+    )
+  rescue RelaySync::ConnectionError => e
+    Rails.logger.error "[NegentropySyncJob] Connection error: #{e.message}"
+    @sync_state&.mark_error!(e.message)
+    @status_handled = true
+    raise # Let retry mechanism handle it
   rescue StandardError => e
     Rails.logger.error "[NegentropySyncJob] Error: #{e.message}"
     @sync_state&.mark_error!(e.message)
+    @status_handled = true
     raise
+  ensure
+    # Safety net: if status is still 'syncing' and wasn't handled, reset to idle
+    # This prevents jobs from leaving status stuck if terminated unexpectedly
+    if @sync_state&.syncing? && !@status_handled
+      Rails.logger.warn "[NegentropySyncJob] Ensure block resetting stuck syncing status for #{@relay_url}"
+      @sync_state.reset_to_idle!
+    end
   end
 
   private
 
   def find_or_create_sync_state
-    filter_hash = Digest::SHA256.hexdigest(@filter.except(:since, :until).to_json)[0, 16]
-    SyncState.find_or_create_by!(relay_url: @relay_url, filter_hash: filter_hash) do |state|
-      state.direction = @direction
-    end
-  end
-
-  def perform_sync(connection)
-    # Build local storage with matching events
-    storage = build_local_storage
-    Rails.logger.info "[NegentropySyncJob] Local storage has #{storage.size} events"
-
-    # Create reconciler
-    frame_size = RelaySync.configuration.sync_settings.negentropy_frame_size
-    reconciler = Negentropy::ClientReconciler.new(storage: storage, frame_size_limit: frame_size)
-
-    # Generate unique subscription ID
-    subscription_id = "neg_#{SecureRandom.hex(8)}"
-
-    # Register handler for NEG-MSG responses
-    RelaySync.manager.register_neg_handler(subscription_id, reconciler: reconciler) do |have_ids, need_ids, complete|
-      handle_reconcile_result(have_ids, need_ids, complete, connection)
-    end
-
-    begin
-      # Generate and send initial message
-      initial_message = reconciler.initiate
-      connection.neg_open(subscription_id, @filter, initial_message)
-      Rails.logger.info "[NegentropySyncJob] Sent NEG-OPEN for #{subscription_id}"
-
-      # Wait for reconciliation to complete - timeout is a hard failure
-      completed = wait_for_completion
-      unless completed
-        Rails.logger.error "[NegentropySyncJob] Sync timeout - aborting without processing partial results"
-        connection.neg_close(subscription_id)
-        @sync_state.mark_error!("Sync timeout after #{SYNC_TIMEOUT}s")
-        return
-      end
-
-      # Process results only if reconciliation completed successfully
-      process_sync_results(connection)
-
-      @sync_state.mark_completed!
-      Rails.logger.info "[NegentropySyncJob] Sync complete. Have: #{@have_ids.size}, Need: #{@need_ids.size}"
-    ensure
-      RelaySync.manager.unregister_neg_handler(subscription_id)
-    end
-  end
-
-  def handle_reconcile_result(have_ids, need_ids, complete, connection)
-    @mutex.synchronize do
-      @have_ids.concat(have_ids)
-      @need_ids.concat(need_ids)
-
-      if complete
-        @complete = true
-        @condition.broadcast
-      end
-    end
-  end
-
-  # Wait for reconciliation to complete
-  # @return [Boolean] true if completed, false if timeout
-  def wait_for_completion
-    deadline = Time.current + SYNC_TIMEOUT
-
-    @mutex.synchronize do
-      until @complete
-        remaining = deadline - Time.current
-        return false if remaining <= 0
-
-        @condition.wait(@mutex, remaining)
-      end
-      true
-    end
-  end
-
-  def process_sync_results(connection)
-    # Download events we need (if direction allows)
-    if should_download? && @need_ids.any?
-      Rails.logger.info "[NegentropySyncJob] Requesting #{@need_ids.size} missing events"
-      fetch_missing_events(connection, @need_ids)
-    end
-
-    # Upload events we have that remote needs (if direction allows)
-    if should_upload? && @have_ids.any?
-      Rails.logger.info "[NegentropySyncJob] Uploading #{@have_ids.size} events to relay"
-      upload_events(@have_ids)
-    end
-  end
-
-  def fetch_missing_events(connection, event_ids)
-    # Request missing events in batches with EOSE-aware completion
-    batch_size = RelaySync.configuration.sync_settings.batch_size
-    fetched_count = 0
-
-    event_ids.each_slice(batch_size) do |batch|
-      sub_id = "fetch_#{SecureRandom.hex(4)}"
-      filter = { ids: batch }
-
-      # Set up EOSE waiting mechanism
-      eose_mutex = Mutex.new
-      eose_condition = ConditionVariable.new
-      eose_received = false
-
-      RelaySync.manager.register_eose_handler(sub_id) do
-        eose_mutex.synchronize do
-          eose_received = true
-          eose_condition.broadcast
-        end
-      end
-
-      begin
-        connection.subscribe(sub_id, [filter])
-
-        # Wait for EOSE or timeout
-        deadline = Time.current + FETCH_TIMEOUT
-        eose_mutex.synchronize do
-          until eose_received
-            remaining = deadline - Time.current
-            if remaining <= 0
-              Rails.logger.warn "[NegentropySyncJob] EOSE timeout for batch fetch #{sub_id}"
-              break
-            end
-            eose_condition.wait(eose_mutex, remaining)
-          end
-        end
-
-        fetched_count += batch.size
-      ensure
-        RelaySync.manager.unregister_eose_handler(sub_id)
-        connection.unsubscribe(sub_id)
-      end
-    end
-
-    @sync_state.update!(events_downloaded: @sync_state.events_downloaded + fetched_count)
-  end
-
-  # Upload events that we have but remote needs
-  # @param nostr_event_ids [Array<String>] hex-encoded Nostr event IDs
-  def upload_events(nostr_event_ids)
-    events = Event.where(event_id: nostr_event_ids).active
-    return if events.empty?
-
-    UploadEventsJob.perform_later(
+    # Use "down" for filter_hash consistency - ensures one SyncState per relay for downloads
+    # The @direction is still used by StartNegentropy for upload behavior
+    SyncState.for_sync(
       relay_url: @relay_url,
-      record_ids: events.pluck(:id)
+      direction: "down",
+      filter: @base_filter
     )
   end
 
-  def build_local_storage
-    scope = Event.active
+  def ensure_connection!(relay_url)
+    conn = RelaySync.manager.connection_for(relay_url)
 
-    # Apply filter criteria
-    scope = scope.where(kind: @filter[:kinds]) if @filter[:kinds].present?
-    scope = scope.where("nostr_created_at >= ?", Time.at(@filter[:since]).utc) if @filter[:since].present?
-    scope = scope.where("nostr_created_at <= ?", Time.at(@filter[:until]).utc) if @filter[:until].present?
-    scope = scope.where(pubkey: @filter[:authors]) if @filter[:authors].present?
+    # If already connected, we're good
+    if conn&.connected?
+      Rails.logger.debug "[NegentropySyncJob] Reusing existing connection to #{relay_url}"
+      return
+    end
 
-    Negentropy::Storage.from_scope(scope)
+    # If connection exists but not connected, try reconnecting
+    if conn && !conn.connected?
+      Rails.logger.info "[NegentropySyncJob] Reconnecting to #{relay_url} (state: #{conn.state})"
+      conn.connect
+    else
+      # No connection exists, create new one
+      Rails.logger.info "[NegentropySyncJob] Creating new connection to #{relay_url}"
+      RelaySync.manager.add_connection(relay_url)
+    end
+
+    wait_for_connection(relay_url)
   end
 
-  def should_download?
-    @direction.in?(%w[down both])
+  def wait_for_connection(relay_url, timeout: 30)
+    deadline = Time.now + timeout
+
+    loop do
+      conn = RelaySync.manager.connection_for(relay_url)
+      if conn&.connected?
+        Rails.logger.debug "[NegentropySyncJob] Connected to #{relay_url}"
+        return
+      end
+
+      if Time.now > deadline
+        Rails.logger.error "[NegentropySyncJob] Connection state: #{conn&.state || 'no connection'}"
+        raise RelaySync::ConnectionError, "Timeout connecting to #{relay_url}"
+      end
+
+      sleep 0.5
+    end
   end
 
-  def should_upload?
-    @direction.in?(%w[up both])
+  def stale_threshold
+    RelaySync.configuration.sync_settings.stale_threshold_minutes.minutes
   end
 end
