@@ -56,3 +56,9 @@ gem "paranoia", "~> 3.1"
 # WebSocket client for connecting to Nostr relays
 gem "faye-websocket", "~> 0.12"
 gem "eventmachine", "~> 1.2"
+
+# Service object infrastructure
+gem "dry-types", "~> 1.7"
+gem "dry-initializer", "~> 3.1"
+gem "dry-struct", "~> 1.6"
+gem "dry-initializer-rails", "~> 3.1"
