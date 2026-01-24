@@ -1,7 +1,90 @@
+# frozen_string_literal: true
+
 # Omakase Ruby styling for Rails
 inherit_gem: { rubocop-rails-omakase: rubocop.yml }
 
 AllCops:
+  TargetRubyVersion: 4.0
+  NewCops: enable
   Exclude:
     - 'db/migrate/**/*'
     - 'db/schema*.rb'
+    - 'db/queue_schema.rb'
+    - 'vendor/**/*'
+    - 'node_modules/**/*'
+
+# =============================================================================
+# Ruby 4.0 Style Enforcement
+# =============================================================================
+
+# Prepare for Ruby 4.x frozen string literals default
+Style/FrozenStringLiteralComment:
+  Enabled: true
+  EnforcedStyle: always
+
+# Prefer `it` over numbered parameters (_1) for single-param blocks
+Style/ItBlockParameter:
+  Enabled: true
+  EnforcedStyle: only_numbered_parameters
+
+# Numbered parameters style
+Style/NumberedParameters:
+  Enabled: true
+  EnforcedStyle: disallow
+
+# Ruby 4.0: pathname is built-in, no require needed
+Lint/RedundantRequireStatement:
+  Enabled: true
+
+# =============================================================================
+# Modern Ruby Syntax
+# =============================================================================
+
+# Modern hash syntax with shorthand
+Style/HashSyntax:
+  Enabled: true
+  EnforcedStyle: ruby19_no_mixed_keys
+  EnforcedShorthandSyntax: always
+
+# Endless methods (Ruby 3.0+)
+Style/EndlessMethod:
+  Enabled: true
+  EnforcedStyle: allow_single_line
+
+# Lambda literal style: -> over lambda
+Style/Lambda:
+  Enabled: true
+  EnforcedStyle: literal
+
+# Safe navigation operator
+Style/SafeNavigation:
+  Enabled: true
+
+# Modern argument forwarding (...)
+Style/ArgumentsForwarding:
+  Enabled: true
+
+# Block delimiters
+Style/BlockDelimiters:
+  Enabled: true
+  EnforcedStyle: semantic
+
+# =============================================================================
+# Code Quality
+# =============================================================================
+
+# Consistent empty literals
+Style/EmptyLiteral:
+  Enabled: true
+
+# Redundant self assignment
+Style/RedundantSelfAssignment:
+  Enabled: true
+
+# Hash-like case statements (pattern matching alternative)
+Style/HashLikeCase:
+  Enabled: true
+
+# Prefer symbols for hash keys
+Style/StringHashKeys:
+  Enabled: true
