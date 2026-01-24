@@ -23,9 +23,9 @@ module RelaySync
         parse_ok(message)
       when "NOTICE"
         parse_notice(message)
-      when "NEG-MSG"
+      when Negentropy::MessageType::NEG_MSG
         parse_neg_msg(message)
-      when "NEG-ERR"
+      when Negentropy::MessageType::NEG_ERR
         parse_neg_err(message)
       when "CLOSED"
         parse_closed(message)
@@ -66,7 +66,7 @@ module RelaySync
     # @param initial_message [String] hex-encoded initial message
     # @return [Array] NEG-OPEN message array
     def build_neg_open(subscription_id, filter, initial_message)
-      [ "NEG-OPEN", subscription_id, filter, initial_message ]
+      [ Negentropy::MessageType::NEG_OPEN, subscription_id, filter, initial_message ]
     end
 
     # Build a NEG-MSG message for Negentropy sync
@@ -74,14 +74,14 @@ module RelaySync
     # @param message [String] hex-encoded message
     # @return [Array] NEG-MSG message array
     def build_neg_msg(subscription_id, message)
-      [ "NEG-MSG", subscription_id, message ]
+      [ Negentropy::MessageType::NEG_MSG, subscription_id, message ]
     end
 
     # Build a NEG-CLOSE message
     # @param subscription_id [String] subscription ID
     # @return [Array] NEG-CLOSE message array
     def build_neg_close(subscription_id)
-      [ "NEG-CLOSE", subscription_id ]
+      [ Negentropy::MessageType::NEG_CLOSE, subscription_id ]
     end
 
     # Validate a Nostr event structure

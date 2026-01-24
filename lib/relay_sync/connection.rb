@@ -76,20 +76,20 @@ module RelaySync
     # @param filter [Hash] Nostr filter
     # @param initial_message [String] hex-encoded initial negentropy message
     def neg_open(subscription_id, filter, initial_message)
-      send_message([ "NEG-OPEN", subscription_id, filter, initial_message ])
+      send_message([ Negentropy::MessageType::NEG_OPEN, subscription_id, filter, initial_message ])
     end
 
     # Send Negentropy NEG-MSG message
     # @param subscription_id [String] subscription ID
     # @param message [String] hex-encoded negentropy message
     def neg_msg(subscription_id, message)
-      send_message([ "NEG-MSG", subscription_id, message ])
+      send_message([ Negentropy::MessageType::NEG_MSG, subscription_id, message ])
     end
 
     # Send Negentropy NEG-CLOSE message
     # @param subscription_id [String] subscription ID
     def neg_close(subscription_id)
-      send_message([ "NEG-CLOSE", subscription_id ])
+      send_message([ Negentropy::MessageType::NEG_CLOSE, subscription_id ])
     end
 
     def connected?
@@ -181,9 +181,9 @@ module RelaySync
         handle_auth(message[1])
       when "CLOSED"
         handle_closed(message[1], message[2])
-      when "NEG-MSG"
+      when Negentropy::MessageType::NEG_MSG
         handle_neg_msg(message[1], message[2])
-      when "NEG-ERR"
+      when Negentropy::MessageType::NEG_ERR
         handle_neg_err(message[1], message[2])
       else
         logger.warn "[RelaySync] Unknown message type from #{url}: #{type}"
