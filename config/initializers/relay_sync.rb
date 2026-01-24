@@ -1,9 +1,10 @@
 # frozen_string_literal: true
 
-# Configure RelaySync library for syncing events with upstream Nostr relays
-# The library is defined in lib/relay_sync.rb, this initializer only configures it
+# Load Negentropy protocol library for set reconciliation
+require "negentropy"
 
-require_relative "../../lib/relay_sync"
+# Configure RelaySync library for syncing events with upstream Nostr relays
+require "relay_sync"
 
 RelaySync.configure do |config|
   config.load_from_yaml(Rails.root.join("config/relays.yml"), Rails.env)
