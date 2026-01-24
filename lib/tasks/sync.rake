@@ -94,9 +94,9 @@ namespace :sync do
     puts "Triggering #{mode} sync#{relay_url ? " for #{relay_url}" : " for all relays"}..."
 
     if relay_url
-      result = Sync::Orchestrator.call(mode: mode, relay_url: relay_url)
+      result = Sync::Orchestrator.call(mode:, relay_url:)
     else
-      result = Sync::Orchestrator.call(mode: mode)
+      result = Sync::Orchestrator.call(mode:)
     end
 
     puts "Dispatched #{result[:dispatched]} job(s)"
@@ -118,7 +118,7 @@ namespace :sync do
     relay_url = args[:relay_url]
 
     if relay_url
-      states = SyncState.where(relay_url: relay_url)
+      states = SyncState.where(relay_url:)
       count = states.count
       states.destroy_all
       puts "Reset #{count} sync state(s) for #{relay_url}"

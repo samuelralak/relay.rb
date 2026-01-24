@@ -99,8 +99,8 @@ class EventTagTest < ActiveSupport::TestCase
   # =========================================
 
   test "by_tag_name, by_tag_value, by_tag" do
-    EventTag.by_tag_name("p").each { |t| assert_equal "p", t.tag_name }
-    EventTag.by_tag_value(@p_tag.tag_value).each { |t| assert_equal @p_tag.tag_value, t.tag_value }
+    EventTag.by_tag_name("p").each do |t| assert_equal "p", t.tag_name end
+    EventTag.by_tag_value(@p_tag.tag_value).each do |t| assert_equal @p_tag.tag_value, t.tag_value end
 
     EventTag.by_tag("p", @p_tag.tag_value).each do |t|
       assert_equal "p", t.tag_name
@@ -109,7 +109,7 @@ class EventTagTest < ActiveSupport::TestCase
   end
 
   test "by_kind and by_kinds" do
-    EventTag.by_kind(1).each { |t| assert_equal 1, t.kind }
+    EventTag.by_kind(1).each do |t| assert_equal 1, t.kind end
     EventTag.by_kinds([ 1, 7 ]).each { |t| assert_includes [ 1, 7 ], t.kind }
   end
 
@@ -130,7 +130,7 @@ class EventTagTest < ActiveSupport::TestCase
   test "since and until_time filter by timestamp" do
     timestamp = 30.minutes.ago.to_i
 
-    EventTag.since(timestamp).each { |t| assert t.nostr_created_at >= Time.at(timestamp).utc }
+    EventTag.since(timestamp).each do |t| assert t.nostr_created_at >= Time.at(timestamp).utc end
     EventTag.until_time(timestamp).each { |t| assert t.nostr_created_at <= Time.at(timestamp).utc }
   end
 

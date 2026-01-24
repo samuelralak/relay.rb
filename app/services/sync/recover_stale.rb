@@ -11,7 +11,7 @@ module Sync
       recovered_stale = recover_stale_syncs
       retried_errors = retry_errored_syncs
 
-      { recovered_stale: recovered_stale, retried_errors: retried_errors }
+      { recovered_stale:, retried_errors: }
     end
 
     private

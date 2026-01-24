@@ -225,7 +225,7 @@ class EventTest < ActiveSupport::TestCase
   test "since and until_time filter by timestamp" do
     timestamp = 30.minutes.ago.to_i
 
-    Event.since(timestamp).each { |e| assert e.nostr_created_at >= Time.at(timestamp).utc }
+    Event.since(timestamp).each do |e| assert e.nostr_created_at >= Time.at(timestamp).utc end
     Event.until_time(timestamp).each { |e| assert e.nostr_created_at <= Time.at(timestamp).utc }
   end
 
@@ -270,7 +270,7 @@ class EventTest < ActiveSupport::TestCase
   end
 
   test "matching_filter handles tag filters" do
-    results = Event.matching_filter("#t" => [ "nostr" ], kinds: [ 1 ])
+    results = Event.matching_filter("#t": [ "nostr" ], kinds: [ 1 ])
 
     assert results.exists?
     results.each { |e| assert e.event_tags.exists?(tag_name: "t", tag_value: "nostr") }

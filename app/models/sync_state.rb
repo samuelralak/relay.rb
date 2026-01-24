@@ -83,9 +83,9 @@ class SyncState < ApplicationRecord
   # @param filter [Hash] optional filter criteria
   # @return [SyncState]
   def self.for_sync(relay_url:, direction:, filter: {})
-    filter_hash = compute_filter_hash(direction: direction, filter: filter)
+    filter_hash = compute_filter_hash(direction:, filter:)
 
-    find_or_create_by!(relay_url: relay_url, filter_hash: filter_hash) do |state|
+    find_or_create_by!(relay_url:, filter_hash:) do |state|
       state.direction = direction
       state.status = "idle"
       state.events_downloaded = 0
@@ -94,7 +94,7 @@ class SyncState < ApplicationRecord
   rescue ActiveRecord::RecordNotUnique
     # Handle race condition: another process created the record simultaneously
     # Simply find and return the existing record
-    find_by!(relay_url: relay_url, filter_hash: filter_hash)
+    find_by!(relay_url:, filter_hash:)
   end
 
   validates :relay_url, presence: true, uniqueness: { scope: :filter_hash }
@@ -118,7 +118,7 @@ class SyncState < ApplicationRecord
 
   def mark_download_progress!(event_id:, timestamp:, count: 1)
     # Use atomic increment to avoid race conditions
-    self.class.where(id: id).update_all([
+    self.class.where(id:).update_all([
       "last_download_event_id = ?, last_download_timestamp = ?, last_synced_at = ?, " \
       "events_downloaded = events_downloaded + ?, updated_at = ?",
       event_id, timestamp, Time.current, count, Time.current
@@ -128,7 +128,7 @@ class SyncState < ApplicationRecord
 
   def mark_upload_progress!(event_id:, timestamp:, count: 1)
     # Use atomic increment to avoid race conditions
-    self.class.where(id: id).update_all([
+    self.class.where(id:).update_all([
       "last_upload_event_id = ?, last_upload_timestamp = ?, last_synced_at = ?, " \
       "events_uploaded = events_uploaded + ?, updated_at = ?",
       event_id, timestamp, Time.current, count, Time.current
@@ -141,7 +141,7 @@ class SyncState < ApplicationRecord
   def increment_events_downloaded!(count)
     return if count <= 0
 
-    self.class.where(id: id).update_all([
+    self.class.where(id:).update_all([
       "events_downloaded = events_downloaded + ?, updated_at = ?",
       count, Time.current
     ])
@@ -153,7 +153,7 @@ class SyncState < ApplicationRecord
   def increment_events_uploaded!(count)
     return if count <= 0
 
-    self.class.where(id: id).update_all([
+    self.class.where(id:).update_all([
       "events_uploaded = events_uploaded + ?, updated_at = ?",
       count, Time.current
     ])

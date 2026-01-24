@@ -47,8 +47,8 @@ module Sync
 
       # Register event handler to process and count received events
       RelaySync.manager.register_event_handler(sub_id) do |conn, subscription_id, event_data|
-        @counter_mutex.synchronize { @fetched_count += 1 }
-        batch_mutex.synchronize { batch_fetched += 1 }
+        @counter_mutex.synchronize do @fetched_count += 1 end
+        batch_mutex.synchronize do batch_fetched += 1 end
         # Queue event for processing
         ProcessEventJob.perform_later(event_data.to_json, conn.url)
       end

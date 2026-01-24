@@ -97,7 +97,7 @@ class NegentropySyncJob < ApplicationJob
       # This provides accurate status during multi-chunk backfill
       Rails.logger.info "[NegentropySyncJob] Scheduling next chunk for #{relay_url}"
       self.class.perform_later(
-        relay_url: relay_url,
+        relay_url:,
         filter: @base_filter,
         direction: @direction,
         backfill_target: @backfill_target.to_i,
@@ -125,7 +125,7 @@ class NegentropySyncJob < ApplicationJob
                         @base_filter.merge(since: @backfill_target.to_i)
     end
     PollingSyncJob.perform_later(
-      relay_url: relay_url,
+      relay_url:,
       filter: fallback_filter,
       mode: RelaySync::SyncMode::BACKFILL
     )

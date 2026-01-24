@@ -23,7 +23,7 @@ module RelaySync
       # Register OK handler with Manager
       RelaySync.manager.register_ok_handler(event_id) do |success, message|
         @mutex.synchronize do
-          @results[event_id] = { success: success, message: message }
+          @results[event_id] = { success:, message: }
           @condition.broadcast
         end
       end
@@ -77,7 +77,7 @@ module RelaySync
         sleep delay
       end
 
-      { published: published, failed: failed, duplicates: duplicates }
+      { published:, failed:, duplicates: }
     end
 
     private

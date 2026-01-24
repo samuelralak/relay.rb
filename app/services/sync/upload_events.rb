@@ -33,9 +33,9 @@ module Sync
     end
 
     def sync_state
-      @sync_state ||= SyncState.find_or_create_by!(relay_url: relay_url, filter_hash: "upload") do |state|
+      @sync_state ||= SyncState.find_or_create_by!(relay_url:, filter_hash: "upload") { |state|
         state.direction = "up"
-      end
+      }
     end
 
     def load_events

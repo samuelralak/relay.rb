@@ -6,14 +6,14 @@ module Negentropy
   class ReconcilerTest < ActiveSupport::TestCase
     test "requires sealed storage" do
       storage = Storage.new
-      assert_raises(ArgumentError) { Reconciler.new(storage: storage) }
+      assert_raises(ArgumentError) { Reconciler.new(storage:) }
     end
 
     test "initiate with empty storage" do
       storage = Storage.new
       storage.seal
 
-      reconciler = Reconciler.new(storage: storage)
+      reconciler = Reconciler.new(storage:)
       message_hex = reconciler.initiate
 
       message = Message.from_hex(message_hex)
@@ -27,7 +27,7 @@ module Negentropy
     test "initiate with items sends fingerprint" do
       storage = create_storage_with_events([ 100, 200, 300 ])
 
-      reconciler = Reconciler.new(storage: storage)
+      reconciler = Reconciler.new(storage:)
       message_hex = reconciler.initiate
 
       message = Message.from_hex(message_hex)
@@ -196,7 +196,7 @@ module Negentropy
       timestamps = (1..30).map { |i| i * 100 }
       storage = create_storage_with_events(timestamps)
 
-      reconciler = Reconciler.new(storage: storage)
+      reconciler = Reconciler.new(storage:)
       message_hex = reconciler.initiate
 
       # The initial message should have fingerprint(s)
@@ -216,7 +216,7 @@ module Negentropy
       message.add_fingerprint(upper, storage.fingerprint(Bound.min, upper))
       message.add_fingerprint(Bound.max, storage.fingerprint(upper, Bound.max))
 
-      reconciler = Reconciler.new(storage: storage, frame_size_limit: 1039)
+      reconciler = Reconciler.new(storage:, frame_size_limit: 1039)
       response_hex, have_ids, need_ids = reconciler.reconcile(message.to_hex)
 
       assert response_hex, "Expected a response when frame limit defers ranges"
@@ -245,7 +245,7 @@ module Negentropy
     def create_storage_with_ids(hex_ids)
       storage = Storage.new
       hex_ids.each_with_index do |id, i|
-        storage.add({ id: id, created_at: (i + 1) * 100 })
+        storage.add({ id:, created_at: (i + 1) * 100 })
       end
       storage.seal
       storage

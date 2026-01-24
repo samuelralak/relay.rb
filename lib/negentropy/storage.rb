@@ -24,7 +24,7 @@ module Negentropy
         timestamp = event.is_a?(Hash) ? event[:created_at] : event.nostr_created_at.to_i
         hex_id = event.is_a?(Hash) ? event[:id] : event.event_id
         binary_id = [ hex_id ].pack("H*")
-        new(timestamp: timestamp, id: binary_id)
+        new(timestamp:, id: binary_id)
       end
     end
 

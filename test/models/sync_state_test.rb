@@ -330,7 +330,7 @@ class SyncStateTest < ActiveSupport::TestCase
     existing = SyncState.create!(
       relay_url: "wss://race.relay.com",
       direction: "down",
-      filter_hash: filter_hash,
+      filter_hash:,
       status: "idle",
       events_downloaded: 0,
       events_uploaded: 0
@@ -458,7 +458,7 @@ class SyncStateTest < ActiveSupport::TestCase
     target = 1.year.ago
 
     freeze_time do
-      @sync_state.initialize_backfill!(target: target)
+      @sync_state.initialize_backfill!(target:)
 
       assert_equal target.to_i, @sync_state.backfill_target.to_i
       assert_equal Time.current.to_i, @sync_state.backfill_until.to_i
@@ -517,7 +517,7 @@ class SyncStateTest < ActiveSupport::TestCase
     @sync_state.update!(backfill_target: 1.month.ago, backfill_until: Time.current)
 
     chunk_start = 1.week.ago
-    @sync_state.mark_backfill_chunk_completed!(chunk_start: chunk_start)
+    @sync_state.mark_backfill_chunk_completed!(chunk_start:)
 
     assert_equal chunk_start.to_i, @sync_state.backfill_until.to_i
   end

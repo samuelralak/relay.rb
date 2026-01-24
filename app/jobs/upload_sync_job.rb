@@ -35,7 +35,7 @@ class UploadSyncJob < ApplicationJob
     @sync_state.mark_syncing!
 
     result = Sync::UploadEvents.call(
-      relay_url: relay_url,
+      relay_url:,
       record_ids: events_scope.pluck(:id)
     )
 

@@ -18,7 +18,7 @@ module Sync
     private
 
     def event_exists?
-      Event.exists?(event_id: event_id)
+      Event.exists?(event_id:)
     end
 
     def event_id
@@ -27,7 +27,7 @@ module Sync
 
     def create_event
       Event.create!(
-        event_id: event_id,
+        event_id:,
         pubkey: event_data[:pubkey] || event_data["pubkey"],
         nostr_created_at: Time.at(event_data[:created_at] || event_data["created_at"]).utc,
         kind: event_data[:kind] || event_data["kind"],

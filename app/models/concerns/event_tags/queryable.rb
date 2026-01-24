@@ -9,7 +9,7 @@ module EventTags
       scope :by_tag_name, ->(name) { where(tag_name: name) }
       scope :by_tag_value, ->(value) { where(tag_value: value) }
       scope :by_tag, ->(name, value) { by_tag_name(name).by_tag_value(value) }
-      scope :by_kind, ->(kind) { kind.present? ? where(kind: kind) : all }
+      scope :by_kind, ->(kind) { kind.present? ? where(kind:) : all }
       scope :by_kinds, ->(kinds) { kinds.present? ? where(kind: kinds) : all }
 
       # Common single-letter tag scopes
@@ -55,8 +55,8 @@ module EventTags
         event_ids_for_tag(
           tag_name: TagNames::EVENT,
           tag_values: [ event_id ],
-          kinds: kinds,
-          limit: limit
+          kinds:,
+          limit:
         )
       end
 
@@ -65,8 +65,8 @@ module EventTags
         event_ids_for_tag(
           tag_name: TagNames::PUBKEY,
           tag_values: [ pubkey ],
-          kinds: kinds,
-          limit: limit
+          kinds:,
+          limit:
         )
       end
 
@@ -76,8 +76,8 @@ module EventTags
         event_ids_for_tag(
           tag_name: TagNames::HASHTAG,
           tag_values: [ normalized ],
-          kinds: kinds,
-          limit: limit
+          kinds:,
+          limit:
         )
       end
 
@@ -86,8 +86,8 @@ module EventTags
         event_ids_for_tag(
           tag_name: TagNames::ADDRESSABLE,
           tag_values: [ coordinate ],
-          kinds: kinds,
-          limit: limit
+          kinds:,
+          limit:
         )
       end
     end

@@ -6,7 +6,8 @@ module RelaySync
   class MessageHandlerTest < ActiveSupport::TestCase
     # Parsing tests
     test "parses EVENT message" do
-      event = { "id" => "abc", "pubkey" => "xyz", "kind" => 1 }
+      # JSON.parse returns string keys, so we test with string keys
+      event = { "id" => "abc", "pubkey" => "xyz", "kind" => 1 } # rubocop:disable Style/StringHashKeys
       raw = JSON.generate([ "EVENT", "sub123", event ])
 
       result = MessageHandler.parse(raw)
@@ -154,13 +155,13 @@ module RelaySync
     # Event validation tests
     test "valid_event? returns true for valid event with string keys" do
       event = {
-        "id" => "a" * 64,
-        "pubkey" => "b" * 64,
-        "created_at" => 1234567890,
-        "kind" => 1,
-        "tags" => [],
-        "content" => "hello",
-        "sig" => "c" * 128
+        id: "a" * 64,
+        pubkey: "b" * 64,
+        created_at: 1234567890,
+        kind: 1,
+        tags: [],
+        content: "hello",
+        sig: "c" * 128
       }
 
       assert MessageHandler.valid_event?(event)
@@ -182,12 +183,12 @@ module RelaySync
 
     test "valid_event? returns false for missing required key" do
       event = {
-        "id" => "a" * 64,
-        "pubkey" => "b" * 64,
-        "created_at" => 1234567890,
-        "kind" => 1,
-        "tags" => [],
-        "content" => "hello"
+        id: "a" * 64,
+        pubkey: "b" * 64,
+        created_at: 1234567890,
+        kind: 1,
+        tags: [],
+        content: "hello"
         # missing sig
       }
 

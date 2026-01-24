@@ -17,11 +17,11 @@ module Events
 
     class_methods do
       def find_replaceable(pubkey:, kind:)
-        where(pubkey: pubkey, kind: kind).active.newest_first.first
+        where(pubkey:, kind:).active.newest_first.first
       end
 
       def find_addressable(pubkey:, kind:, d_tag:)
-        where(pubkey: pubkey, kind: kind, d_tag: d_tag).active.newest_first.first
+        where(pubkey:, kind:, d_tag:).active.newest_first.first
       end
 
       def matching_filter(filter)
@@ -62,7 +62,7 @@ module Events
         tag_filters.each do |tag_name, tag_values|
           # Use EXISTS subquery for each tag filter - more efficient than JOIN
           subquery = EventTag.where(EventTag.arel_table[:event_id].eq(Event.arel_table[:id]))
-                             .where(tag_name: tag_name, tag_value: tag_values, deleted_at: nil)
+                             .where(tag_name:, tag_value: tag_values, deleted_at: nil)
 
           scope = scope.where(subquery.arel.exists)
         end

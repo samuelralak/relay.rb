@@ -104,11 +104,11 @@ module RelaySync
 
       def to_h
         {
-          url: url,
+          url:,
           enabled: enabled?,
           backfill: backfill?,
           negentropy: negentropy?,
-          direction: direction
+          direction:
         }
       end
     end
@@ -167,21 +167,21 @@ module RelaySync
 
       def to_h
         {
-          batch_size: batch_size,
-          max_concurrent_connections: max_concurrent_connections,
-          reconnect_delay_seconds: reconnect_delay_seconds,
-          max_reconnect_attempts: max_reconnect_attempts,
-          backfill_since_hours: backfill_since_hours,
-          event_kinds: event_kinds,
-          negentropy_frame_size: negentropy_frame_size,
-          upload_batch_size: upload_batch_size,
-          upload_delay_ms: upload_delay_ms,
-          resume_overlap_seconds: resume_overlap_seconds,
-          checkpoint_interval: checkpoint_interval,
-          polling_window_minutes: polling_window_minutes,
-          polling_timeout_seconds: polling_timeout_seconds,
-          stale_threshold_minutes: stale_threshold_minutes,
-          error_retry_after_minutes: error_retry_after_minutes
+          batch_size:,
+          max_concurrent_connections:,
+          reconnect_delay_seconds:,
+          max_reconnect_attempts:,
+          backfill_since_hours:,
+          event_kinds:,
+          negentropy_frame_size:,
+          upload_batch_size:,
+          upload_delay_ms:,
+          resume_overlap_seconds:,
+          checkpoint_interval:,
+          polling_window_minutes:,
+          polling_timeout_seconds:,
+          stale_threshold_minutes:,
+          error_retry_after_minutes:
         }
       end
     end

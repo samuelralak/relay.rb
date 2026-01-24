@@ -45,9 +45,9 @@ module RelaySync
       @running && EM.reactor_running?
     end
 
-    def schedule(&block)
+    def schedule(&)
       start unless running?
-      EM.next_tick(&block)
+      EM.next_tick(&)
     end
   end
 end

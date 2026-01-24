@@ -49,19 +49,19 @@ module Negentropy
 
     # Add a skip range
     def add_skip(upper_bound)
-      @ranges << Range.new(upper_bound: upper_bound, mode: Mode::SKIP, payload: nil)
+      @ranges << Range.new(upper_bound:, mode: Mode::SKIP, payload: nil)
     end
 
     # Add a fingerprint range
     def add_fingerprint(upper_bound, fingerprint)
-      @ranges << Range.new(upper_bound: upper_bound, mode: Mode::FINGERPRINT, payload: fingerprint)
+      @ranges << Range.new(upper_bound:, mode: Mode::FINGERPRINT, payload: fingerprint)
     end
 
     # Add an ID list range
     # @param upper_bound [Bound] upper bound of range
     # @param ids [Array<String>] array of 32-byte binary IDs
     def add_id_list(upper_bound, ids)
-      @ranges << Range.new(upper_bound: upper_bound, mode: Mode::ID_LIST, payload: ids)
+      @ranges << Range.new(upper_bound:, mode: Mode::ID_LIST, payload: ids)
     end
 
     # Encode message to binary
@@ -138,7 +138,7 @@ module Negentropy
           raise ArgumentError, "Unknown mode: #{mode}"
         end
 
-        message.ranges << Range.new(upper_bound: upper_bound, mode: mode, payload: payload)
+        message.ranges << Range.new(upper_bound:, mode:, payload:)
       end
 
       message

@@ -16,7 +16,7 @@ module NostrTestHelpers
   def build_event_attrs(overrides = {})
     event_id = overrides.delete(:event_id) || unique_hex(64)
     {
-      event_id: event_id,
+      event_id:,
       pubkey: HEX_64_ALT,
       nostr_created_at: Time.current,
       kind: 1,

@@ -115,7 +115,7 @@ class PollingSyncJob < ApplicationJob
     # Update cursor periodically (every N events per config)
     if should_checkpoint
       @sync_state.mark_download_progress!(
-        event_id: event_id,
+        event_id:,
         timestamp: Time.at(timestamp),
         count: checkpoint_interval
       )
@@ -196,14 +196,14 @@ class PollingSyncJob < ApplicationJob
   end
 
   def update_final_cursor
-    event_id, timestamp, remaining = @counter_mutex.synchronize do
+    event_id, timestamp, remaining = @counter_mutex.synchronize {
       return unless @latest_event_id && @events_this_batch > 0
       [ @latest_event_id, @latest_timestamp, @events_this_batch % checkpoint_interval ]
-    end
+    }
 
     if remaining && remaining > 0
       @sync_state.mark_download_progress!(
-        event_id: event_id,
+        event_id:,
         timestamp: Time.at(timestamp),
         count: remaining
       )

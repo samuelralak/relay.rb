@@ -45,22 +45,22 @@ module Sync
 
     def create_fake_relay(url:, negentropy: false, backfill: false, direction: "down")
       relay = Object.new
-      relay.define_singleton_method(:url) { url }
-      relay.define_singleton_method(:negentropy?) { negentropy }
-      relay.define_singleton_method(:backfill?) { backfill }
-      relay.define_singleton_method(:direction) { direction }
-      relay.define_singleton_method(:enabled?) { true }
-      relay.define_singleton_method(:upload_enabled?) { direction == "up" || direction == "both" }
+      relay.define_singleton_method(:url) do url end
+      relay.define_singleton_method(:negentropy?) do negentropy end
+      relay.define_singleton_method(:backfill?) do backfill end
+      relay.define_singleton_method(:direction) do direction end
+      relay.define_singleton_method(:enabled?) do true end
+      relay.define_singleton_method(:upload_enabled?) do direction == "up" || direction == "both" end
       relay
     end
 
     def with_fake_configuration(backfill: [], download: [], upload: [])
       fake_config = Object.new
-      fake_config.define_singleton_method(:backfill_relays) { backfill }
-      fake_config.define_singleton_method(:download_relays) { download }
-      fake_config.define_singleton_method(:upload_relays) { upload }
-      fake_config.define_singleton_method(:find_relay) { |url| (backfill + download + upload).find { |r| r.url == url } }
-      fake_config.define_singleton_method(:sync_settings) { @original_config&.sync_settings || RelaySync::Configuration.new.sync_settings }
+      fake_config.define_singleton_method(:backfill_relays) do backfill end
+      fake_config.define_singleton_method(:download_relays) do download end
+      fake_config.define_singleton_method(:upload_relays) do upload end
+      fake_config.define_singleton_method(:find_relay) do |url| (backfill + download + upload).find { |r| r.url == url } end
+      fake_config.define_singleton_method(:sync_settings) do @original_config&.sync_settings || RelaySync::Configuration.new.sync_settings end
 
       RelaySync.instance_variable_set(:@configuration, fake_config)
       yield
@@ -157,7 +157,7 @@ module Sync
       filter_hash = SyncState.compute_filter_hash(direction: "down", filter: {})
       SyncState.create!(
         relay_url: @negentropy_relay.url,
-        filter_hash: filter_hash,
+        filter_hash:,
         direction: "down",
         status: "syncing",
         events_downloaded: 0,
@@ -176,7 +176,7 @@ module Sync
       filter_hash = SyncState.compute_filter_hash(direction: "down", filter: {})
       SyncState.create!(
         relay_url: @negentropy_relay.url,
-        filter_hash: filter_hash,
+        filter_hash:,
         direction: "down",
         status: "syncing",
         updated_at: 1.hour.ago, # Stale
@@ -200,7 +200,7 @@ module Sync
       filter_hash = SyncState.compute_filter_hash(direction: "down", filter: {})
       SyncState.create!(
         relay_url: @negentropy_relay.url,
-        filter_hash: filter_hash,
+        filter_hash:,
         direction: "down",
         status: "completed",
         backfill_target: 1.week.ago,

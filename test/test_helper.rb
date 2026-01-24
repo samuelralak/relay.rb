@@ -1,9 +1,11 @@
+# frozen_string_literal: true
+
 ENV["RAILS_ENV"] ||= "test"
 require_relative "../config/environment"
 require "rails/test_help"
 
 # Load test support files
-Dir[Rails.root.join("test/support/**/*.rb")].each { |f| require f }
+Dir[Rails.root.join("test/support/**/*.rb")].each do |f| require f end
 
 module ActiveSupport
   class TestCase

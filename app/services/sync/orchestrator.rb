@@ -21,7 +21,7 @@ module Sync
         end
       end
 
-      { dispatched: @dispatched, mode: mode }
+      { dispatched: @dispatched, mode: }
     end
 
     private
@@ -83,7 +83,7 @@ module Sync
         filter = sync_mode == RelaySync::SyncMode::FULL ? full_sync_filter : backfill_filter
         PollingSyncJob.perform_later(
           relay_url: relay.url,
-          filter: filter,
+          filter:,
           mode: sync_mode
         )
       end
@@ -113,7 +113,7 @@ module Sync
     end
 
     def already_syncing?(relay_url, filter_hash)
-      state = SyncState.find_by(relay_url: relay_url, filter_hash: filter_hash)
+      state = SyncState.find_by(relay_url:, filter_hash:)
       return false unless state
 
       # Skip if currently syncing and not stale

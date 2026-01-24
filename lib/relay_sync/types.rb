@@ -10,7 +10,7 @@ module RelaySync
     FULL     = "full"
     UPLOAD   = "upload"
 
-    ALL = [REALTIME, BACKFILL, FULL, UPLOAD].freeze
+    ALL = [ REALTIME, BACKFILL, FULL, UPLOAD ].freeze
   end
 
   module Types

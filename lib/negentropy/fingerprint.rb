@@ -19,11 +19,11 @@ module Negentropy
       return empty_fingerprint if ids.empty?
 
       # Sum all IDs as little-endian 256-bit integers mod 2^256
-      sum = ids.reduce(0) do |acc, id|
+      sum = ids.reduce(0) { |acc, id|
         # Convert binary ID to little-endian integer
         id_int = id.unpack("C*").reverse.reduce(0) { |n, byte| (n << 8) | byte }
         (acc + id_int) % MODULO
-      end
+      }
 
       # Convert sum back to 32-byte little-endian binary
       sum_bytes = []

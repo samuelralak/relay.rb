@@ -11,11 +11,11 @@ class SyncOrchestratorJobTest < ActiveSupport::TestCase
 
     # Create empty configuration for tests (no relays = no jobs dispatched)
     empty_config = Object.new
-    empty_config.define_singleton_method(:backfill_relays) { [] }
-    empty_config.define_singleton_method(:download_relays) { [] }
-    empty_config.define_singleton_method(:upload_relays) { [] }
-    empty_config.define_singleton_method(:find_relay) { |_url| nil }
-    empty_config.define_singleton_method(:sync_settings) { @original_config&.sync_settings || RelaySync::Configuration.new.sync_settings }
+    empty_config.define_singleton_method(:backfill_relays) do [] end
+    empty_config.define_singleton_method(:download_relays) do [] end
+    empty_config.define_singleton_method(:upload_relays) do [] end
+    empty_config.define_singleton_method(:find_relay) do |_url| nil end
+    empty_config.define_singleton_method(:sync_settings) do @original_config&.sync_settings || RelaySync::Configuration.new.sync_settings end
 
     RelaySync.instance_variable_set(:@configuration, empty_config)
   end

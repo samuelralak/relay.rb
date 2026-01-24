@@ -26,7 +26,7 @@ class PollingSyncJobTest < ActiveSupport::TestCase
     filter_hash = SyncState.compute_filter_hash(direction: "down", filter: {})
     SyncState.create!(
       relay_url: @relay_url,
-      filter_hash: filter_hash,
+      filter_hash:,
       direction: "down",
       status: "syncing",
       updated_at: 1.minute.ago, # Recent, not stale
@@ -56,7 +56,7 @@ class PollingSyncJobTest < ActiveSupport::TestCase
     filter_hash = SyncState.compute_filter_hash(direction: "down", filter: {})
     stale_state = SyncState.create!(
       relay_url: @relay_url,
-      filter_hash: filter_hash,
+      filter_hash:,
       direction: "down",
       status: "syncing",
       updated_at: 1.hour.ago, # Stale
@@ -101,7 +101,7 @@ class PollingSyncJobTest < ActiveSupport::TestCase
     filter_hash = SyncState.compute_filter_hash(direction: "down", filter: {})
     state = SyncState.create!(
       relay_url: @relay_url,
-      filter_hash: filter_hash,
+      filter_hash:,
       direction: "down",
       status: "idle",
       events_downloaded: 0,

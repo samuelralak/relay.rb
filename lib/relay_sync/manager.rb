@@ -78,9 +78,9 @@ module RelaySync
     def register_neg_handler(subscription_id, reconciler:, error_callback: nil, &callback)
       @mutex.synchronize do
         @neg_handlers[subscription_id] = {
-          reconciler: reconciler,
-          callback: callback,
-          error_callback: error_callback
+          reconciler:,
+          callback:,
+          error_callback:
         }
       end
     end
@@ -117,7 +117,7 @@ module RelaySync
     # @return [Connection] the created connection
     def add_connection(url, callbacks: {})
       combined_callbacks = build_callbacks.merge(callbacks)
-      connection = Connection.new(url: url, callbacks: combined_callbacks)
+      connection = Connection.new(url:, callbacks: combined_callbacks)
 
       @mutex.synchronize do
         @connections[url] = connection

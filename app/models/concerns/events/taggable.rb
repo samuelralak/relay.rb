@@ -19,7 +19,7 @@ module Events
     end
 
     def create_event_tags
-      indexable_tags = tags.each_with_index.filter_map do |tag, index|
+      indexable_tags = tags.each_with_index.filter_map { |tag, index|
         next unless valid_indexable_tag?(tag)
 
         {
@@ -27,12 +27,12 @@ module Events
           tag_name: tag[0],
           tag_value: tag[1],
           tag_index: index,
-          nostr_created_at: nostr_created_at,
-          kind: kind,
+          nostr_created_at:,
+          kind:,
           created_at: Time.current,
           updated_at: Time.current
         }
-      end
+      }
 
       EventTag.insert_all(indexable_tags) if indexable_tags.present?
     end

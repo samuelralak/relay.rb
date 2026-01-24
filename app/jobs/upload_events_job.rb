@@ -8,8 +8,8 @@ class UploadEventsJob < ApplicationJob
   # @param record_ids [Array<Integer>, nil] database record IDs to upload (nil = all new events)
   def perform(relay_url:, record_ids: nil)
     result = Sync::UploadEvents.call(
-      relay_url: relay_url,
-      record_ids: record_ids
+      relay_url:,
+      record_ids:
     )
 
     if result[:reason] == "no_events"

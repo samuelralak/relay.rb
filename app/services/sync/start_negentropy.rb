@@ -23,7 +23,7 @@ module Sync
       sync_state.mark_syncing! if manage_status
       perform_sync
 
-      { have_ids: @have_ids, need_ids: @need_ids, sync_state: sync_state }
+      { have_ids: @have_ids, need_ids: @need_ids, sync_state: }
     rescue StandardError => e
       sync_state&.mark_error!(e.message) if manage_status
       raise
@@ -43,16 +43,16 @@ module Sync
       # Use "down" for filter_hash consistency - ensures one SyncState per relay for downloads
       # The `direction` option is still used for should_download?/should_upload? logic
       @sync_state ||= SyncState.for_sync(
-        relay_url: relay_url,
+        relay_url:,
         direction: "down",
-        filter: filter
+        filter:
       )
     end
 
     def perform_sync
       storage = build_local_storage
       frame_size = RelaySync.configuration.sync_settings.negentropy_frame_size
-      reconciler = Negentropy::Reconciler::Client.new(storage: storage, frame_size_limit: frame_size)
+      reconciler = Negentropy::Reconciler::Client.new(storage:, frame_size_limit: frame_size)
 
       subscription_id = "neg_#{SecureRandom.hex(8)}"
 
@@ -60,8 +60,8 @@ module Sync
 
       RelaySync.manager.register_neg_handler(
         subscription_id,
-        reconciler: reconciler,
-        error_callback: error_callback
+        reconciler:,
+        error_callback:
       ) do |have_ids, need_ids, complete|
         handle_reconcile_result(have_ids, need_ids, complete)
       end
@@ -140,10 +140,10 @@ module Sync
       if should_download? && @need_ids.any?
         Rails.logger.info "[StartNegentropy] Fetching #{@need_ids.size} missing events"
         result = Sync::FetchMissingEvents.call(
-          connection: connection,
+          connection:,
           event_ids: @need_ids,
           batch_size: RelaySync.configuration.sync_settings.batch_size,
-          sync_state: sync_state  # Pass sync_state for incremental counting per batch
+          sync_state:  # Pass sync_state for incremental counting per batch
         )
         Rails.logger.info "[StartNegentropy] FetchMissingEvents result: #{result.inspect}"
         # Note: FetchMissingEvents now handles incremental counting per batch
@@ -157,7 +157,7 @@ module Sync
         events = Event.where(event_id: @have_ids).active
         if events.any?
           UploadEventsJob.perform_later(
-            relay_url: relay_url,
+            relay_url:,
             record_ids: events.pluck(:id)
           )
         end

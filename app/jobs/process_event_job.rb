@@ -13,8 +13,8 @@ class ProcessEventJob < ApplicationJob
     event_data = JSON.parse(event_json, symbolize_names: true)
 
     result = Sync::ProcessEvent.call(
-      event_data: event_data,
-      source_relay: source_relay
+      event_data:,
+      source_relay:
     )
 
     if result[:success]

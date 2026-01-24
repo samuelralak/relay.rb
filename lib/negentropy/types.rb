@@ -10,7 +10,7 @@ module Negentropy
     NEG_CLOSE = "NEG-CLOSE"
     NEG_ERR   = "NEG-ERR"
 
-    ALL = [NEG_OPEN, NEG_MSG, NEG_CLOSE, NEG_ERR].freeze
+    ALL = [ NEG_OPEN, NEG_MSG, NEG_CLOSE, NEG_ERR ].freeze
   end
 
   module Types

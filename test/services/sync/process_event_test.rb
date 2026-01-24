@@ -28,7 +28,7 @@ module Sync
       event_data = valid_event_data
 
       assert_difference "Event.count", 1 do
-        result = ProcessEvent.call(event_data: event_data)
+        result = ProcessEvent.call(event_data:)
 
         assert result[:success], "Expected success but got: #{result.inspect}"
         assert_equal event_data[:id], result[:event_id]
@@ -42,7 +42,7 @@ module Sync
         tags: [ [ "e", "a" * 64 ] ]
       )
 
-      ProcessEvent.call(event_data: event_data)
+      ProcessEvent.call(event_data:)
 
       event = Event.find_by(event_id: event_data[:id])
       assert_not_nil event
@@ -53,6 +53,7 @@ module Sync
     end
 
     test "handles string keys in event data" do
+      # rubocop:disable Style/StringHashKeys
       event_data = {
         "id" => SecureRandom.hex(32),
         "pubkey" => SecureRandom.hex(32),
@@ -62,8 +63,9 @@ module Sync
         "content" => "String keys work",
         "sig" => SecureRandom.hex(64)
       }
+      # rubocop:enable Style/StringHashKeys
 
-      result = ProcessEvent.call(event_data: event_data)
+      result = ProcessEvent.call(event_data:)
 
       assert result[:success]
       assert Event.exists?(event_id: event_data["id"])
@@ -73,7 +75,7 @@ module Sync
       event_data = valid_event_data
 
       result = ProcessEvent.call(
-        event_data: event_data,
+        event_data:,
         source_relay: "wss://relay.example.com"
       )
 
@@ -88,12 +90,12 @@ module Sync
       event_data = valid_event_data
 
       # Create the event first
-      first_result = ProcessEvent.call(event_data: event_data)
+      first_result = ProcessEvent.call(event_data:)
       assert first_result[:success]
 
       # Try to create again
       assert_no_difference "Event.count" do
-        result = ProcessEvent.call(event_data: event_data)
+        result = ProcessEvent.call(event_data:)
 
         assert result[:skipped]
         assert_equal "duplicate", result[:reason]
@@ -102,7 +104,7 @@ module Sync
 
     test "duplicate check uses event_id only" do
       event_data = valid_event_data
-      ProcessEvent.call(event_data: event_data)
+      ProcessEvent.call(event_data:)
 
       # Same event_id but different content should be skipped
       duplicate_data = event_data.merge(content: "Different content")
@@ -143,7 +145,7 @@ module Sync
     test "handles empty tags array" do
       event_data = valid_event_data(tags: [])
 
-      result = ProcessEvent.call(event_data: event_data)
+      result = ProcessEvent.call(event_data:)
 
       assert result[:success]
       event = Event.find_by(event_id: event_data[:id])
@@ -153,7 +155,7 @@ module Sync
     test "handles empty content string" do
       event_data = valid_event_data(content: "")
 
-      result = ProcessEvent.call(event_data: event_data)
+      result = ProcessEvent.call(event_data:)
 
       assert result[:success]
       event = Event.find_by(event_id: event_data[:id])
@@ -163,7 +165,7 @@ module Sync
     test "defaults to empty string when content is nil" do
       event_data = valid_event_data.except(:content)
 
-      result = ProcessEvent.call(event_data: event_data)
+      result = ProcessEvent.call(event_data:)
 
       assert result[:success]
       event = Event.find_by(event_id: event_data[:id])
@@ -173,7 +175,7 @@ module Sync
     test "defaults to empty array when tags is nil" do
       event_data = valid_event_data.except(:tags)
 
-      result = ProcessEvent.call(event_data: event_data)
+      result = ProcessEvent.call(event_data:)
 
       assert result[:success]
       event = Event.find_by(event_id: event_data[:id])
