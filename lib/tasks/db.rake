@@ -13,8 +13,8 @@ namespace :db do
   end
 end
 
-# Auto-load queue schema after db:reset and db:setup
-%w[db:reset db:setup].each do |task|
+# Auto-load queue schema after db:reset, db:setup, and db:test:prepare
+%w[db:reset db:setup db:test:prepare].each do |task|
   Rake::Task[task].enhance do
     Rake::Task["db:load_queue_schema"].invoke
   end
