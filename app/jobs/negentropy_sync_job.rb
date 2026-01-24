@@ -127,7 +127,7 @@ class NegentropySyncJob < ApplicationJob
     PollingSyncJob.perform_later(
       relay_url: relay_url,
       filter: fallback_filter,
-      mode: "backfill"
+      mode: RelaySync::SyncMode::BACKFILL
     )
   rescue RelaySync::ConnectionError => e
     Rails.logger.error "[NegentropySyncJob] Connection error: #{e.message}"

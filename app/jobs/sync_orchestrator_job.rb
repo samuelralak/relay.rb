@@ -6,7 +6,7 @@ class SyncOrchestratorJob < ApplicationJob
   queue_as :sync
 
   # @param mode [String] sync mode: "realtime", "backfill", "full", or "upload"
-  def perform(mode: "realtime")
+  def perform(mode: RelaySync::SyncMode::REALTIME)
     Rails.logger.info "[SyncOrchestratorJob] Starting orchestration (mode: #{mode})"
 
     result = Sync::Orchestrator.call(mode: mode)

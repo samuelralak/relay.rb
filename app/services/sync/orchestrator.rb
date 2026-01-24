@@ -4,7 +4,7 @@ module Sync
   # Central orchestrator that dispatches sync jobs based on relay configuration and SyncState
   # Called by SyncOrchestratorJob (recurring) or manually via rake tasks
   class Orchestrator < BaseService
-    option :mode, type: Types::String.enum("backfill", "realtime", "full", "upload")
+    option :mode, type: RelaySync::Types::SyncMode
     option :relay_url, type: Types::RelayUrl.optional, default: -> { nil }
 
     def call
@@ -14,10 +14,10 @@ module Sync
         dispatch_for_relay(relay_url)
       else
         case mode
-        when "backfill" then dispatch_backfill_jobs
-        when "realtime" then dispatch_realtime_jobs
-        when "full" then dispatch_full_sync_jobs
-        when "upload" then dispatch_upload_jobs
+        when RelaySync::SyncMode::BACKFILL then dispatch_backfill_jobs
+        when RelaySync::SyncMode::REALTIME then dispatch_realtime_jobs
+        when RelaySync::SyncMode::FULL then dispatch_full_sync_jobs
+        when RelaySync::SyncMode::UPLOAD then dispatch_upload_jobs
         end
       end
 
@@ -31,18 +31,18 @@ module Sync
       return unless relay&.enabled?
 
       case mode
-      when "backfill", "full"
+      when RelaySync::SyncMode::BACKFILL, RelaySync::SyncMode::FULL
         dispatch_download_job(relay, mode)
-      when "realtime"
+      when RelaySync::SyncMode::REALTIME
         dispatch_realtime_job(relay)
-      when "upload"
+      when RelaySync::SyncMode::UPLOAD
         dispatch_upload_job(relay) if relay.upload_enabled?
       end
     end
 
     def dispatch_backfill_jobs
       RelaySync.configuration.backfill_relays.each do |relay|
-        dispatch_download_job(relay, "backfill")
+        dispatch_download_job(relay, RelaySync::SyncMode::BACKFILL)
       end
     end
 
@@ -54,7 +54,7 @@ module Sync
 
     def dispatch_full_sync_jobs
       RelaySync.configuration.backfill_relays.each do |relay|
-        dispatch_download_job(relay, "full")
+        dispatch_download_job(relay, RelaySync::SyncMode::FULL)
       end
     end
 
@@ -80,7 +80,7 @@ module Sync
           chunk_hours: sync_settings.negentropy_chunk_hours
         )
       else
-        filter = sync_mode == "full" ? full_sync_filter : backfill_filter
+        filter = sync_mode == RelaySync::SyncMode::FULL ? full_sync_filter : backfill_filter
         PollingSyncJob.perform_later(
           relay_url: relay.url,
           filter: filter,
@@ -99,14 +99,14 @@ module Sync
       PollingSyncJob.perform_later(
         relay_url: relay.url,
         filter: realtime_filter,
-        mode: "realtime"
+        mode: RelaySync::SyncMode::REALTIME
       )
 
       @dispatched += 1
     end
 
     def dispatch_upload_job(relay)
-      return if already_syncing?(relay.url, "upload")
+      return if already_syncing?(relay.url, RelaySync::SyncMode::UPLOAD)
 
       UploadSyncJob.perform_later(relay_url: relay.url)
       @dispatched += 1

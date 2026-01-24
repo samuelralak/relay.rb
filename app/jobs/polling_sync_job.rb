@@ -10,7 +10,7 @@ class PollingSyncJob < ApplicationJob
   # @param relay_url [String] URL of the relay to poll
   # @param filter [Hash] Nostr filter for events to receive
   # @param mode [String] sync mode: "realtime" or "backfill"
-  def perform(relay_url:, filter: {}, mode: "realtime")
+  def perform(relay_url:, filter: {}, mode: RelaySync::SyncMode::REALTIME)
     @relay_url = relay_url
     @filter = filter.symbolize_keys
     @mode = mode
