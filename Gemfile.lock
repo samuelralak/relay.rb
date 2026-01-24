@@ -113,6 +113,10 @@ GEM
       concurrent-ruby (~> 1.0)
       dry-core (~> 1.1)
       zeitwerk (~> 2.6)
+    dry-monads (1.9.0)
+      concurrent-ruby (~> 1.0)
+      dry-core (~> 1.1)
+      zeitwerk (~> 2.6)
     dry-struct (1.8.0)
       dry-core (~> 1.1)
       dry-types (~> 1.8, >= 1.8.2)
@@ -384,6 +388,7 @@ DEPENDENCIES
   dotenv-rails (~> 3.2)
   dry-initializer (~> 3.1)
   dry-initializer-rails (~> 3.1)
+  dry-monads (~> 1.6)
   dry-struct (~> 1.6)
   dry-types (~> 1.7)
   eventmachine (~> 1.2)
@@ -435,6 +440,7 @@ CHECKSUMS
   dry-initializer (3.2.0) sha256=37d59798f912dc0a1efe14a4db4a9306989007b302dcd5f25d0a2a20c166c4e3
   dry-initializer-rails (3.1.1) sha256=1f8d3fd61a055572f30fc3b7bbd3372e0af733fd5796b4ffe29c48c3fb19059e
   dry-logic (1.6.0) sha256=da6fedbc0f90fc41f9b0cc7e6f05f5d529d1efaef6c8dcc8e0733f685745cea2
+  dry-monads (1.9.0) sha256=9348a67b5c862c7a876342dbd94737fdf3fb3c17978382cf6801a85b27215816
   dry-struct (1.8.0) sha256=74c38b559924fb6462ac43ec780c4533a082d7b1d238a8d7857b773b3b8e2966
   dry-types (1.9.0) sha256=7b656fe0a78d2432500ae1f29fefd6762f5a032ca7000e4f36bc111453d45d4d
   ed25519 (1.4.0) sha256=16e97f5198689a154247169f3453ef4cfd3f7a47481fde0ae33206cdfdcac506

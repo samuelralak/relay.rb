@@ -3,34 +3,28 @@
 module Sync
   # Uploads local events to a remote relay
   class UploadEvents < BaseService
+    include Connectionable
+    include ErrorHandleable
+
     option :relay_url, type: Types::RelayUrl
     option :record_ids, type: Types::Array.of(Types::Integer).optional, default: -> { nil }
 
     def call
-      validate_connection!
+      with_error_handling do
+        validate_connection!
 
-      events = load_events
-      return { uploaded: 0, reason: "no_events" } if events.empty?
+        events = load_events
+        return Success(published: 0, reason: "no_events") if events.empty?
 
-      sync_state.mark_syncing!
-      results = upload_events(events)
+        sync_state.mark_syncing!
+        results = perform_upload(events)
 
-      finalize_sync(results)
-      results
-    rescue StandardError => e
-      sync_state&.mark_error!(e.message)
-      raise
+        finalize_sync(results)
+        Success(results)
+      end
     end
 
     private
-
-    def validate_connection!
-      raise RelaySync::ConnectionError, "Not connected to #{relay_url}" unless connection&.connected?
-    end
-
-    def connection
-      @connection ||= RelaySync.manager.connection_for(relay_url)
-    end
 
     def sync_state
       @sync_state ||= SyncState.find_or_create_by!(relay_url:, filter_hash: "upload") { |state|
@@ -42,11 +36,11 @@ module Sync
       if record_ids.present?
         Event.where(id: record_ids).active.newest_first
       else
-        sync_state.events_to_upload.limit(1000)
+        sync_state.events_to_upload.limit(Constants::Batches::MAX_UPLOAD)
       end
     end
 
-    def upload_events(events)
+    def perform_upload(events)
       config = RelaySync.configuration.sync_settings
       publisher = RelaySync::EventPublisher.new(connection)
 

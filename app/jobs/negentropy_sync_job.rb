@@ -70,7 +70,7 @@ class NegentropySyncJob < ApplicationJob
     # Job manages status, not the service
     @sync_state.mark_syncing!
 
-    result = Sync::StartNegentropy.call(
+    result = Sync::SyncWithNegentropy.call(
       relay_url: @relay_url,
       filter: effective_filter,
       direction: @direction,

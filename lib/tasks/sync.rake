@@ -9,7 +9,7 @@ namespace :sync do
   task boot: :environment do
     puts "[sync:boot] Triggering initial backfill sync..."
 
-    result = Sync::Orchestrator.call(mode: "backfill")
+    result = Sync::DispatchSyncJobs.call(mode: "backfill")
 
     puts "[sync:boot] Dispatched #{result[:dispatched]} backfill job(s)"
   end
@@ -94,9 +94,9 @@ namespace :sync do
     puts "Triggering #{mode} sync#{relay_url ? " for #{relay_url}" : " for all relays"}..."
 
     if relay_url
-      result = Sync::Orchestrator.call(mode:, relay_url:)
+      result = Sync::DispatchSyncJobs.call(mode:, relay_url:)
     else
-      result = Sync::Orchestrator.call(mode:)
+      result = Sync::DispatchSyncJobs.call(mode:)
     end
 
     puts "Dispatched #{result[:dispatched]} job(s)"

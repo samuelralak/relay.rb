@@ -58,3 +58,100 @@ app/models/
 - Concern with callbacks: `app/models/concerns/events/taggable.rb`
 - Class methods module: `app/models/sync_states/finder.rb`
 - Status/direction constants: `app/models/sync_states/statuses.rb`
+
+## Service Layer Guidelines
+
+### Service Architecture
+Services follow a three-tier hierarchy:
+1. **Main Services** - Entry points called from jobs/controllers
+2. **Actions** - Internal discrete operations (command pattern)
+3. **Performers** - Internal workers for complex multi-step tasks
+
+### Base Service Pattern
+All services inherit from `BaseService` which provides:
+- `dry-initializer` for typed options
+- `dry-monads` Result types (Success/Failure)
+- Do notation for chaining operations
+- Class-level `call` method
+
+```ruby
+class MyService < BaseService
+  option :input, type: Types::String
+
+  def call
+    # Returns Success(value) or Failure(error)
+    Success(result: processed_value)
+  end
+end
+```
+
+### Result Types
+Services return `Success` or `Failure` results:
+```ruby
+result = MyService.call(input: "value")
+result.success?       # true/false
+result[:key]          # Hash-like access (backward compatible)
+result.value![:key]   # Explicit value access
+```
+
+### Naming Conventions
+| Pattern | Use Case | Examples |
+|---------|----------|----------|
+| `{Verb}{Noun}` | Main services | `ProcessEvent`, `UploadEvents` |
+| `{Verb}{Noun}` | Actions | `FetchEvents`, `BuildFilter` |
+| `{Noun}Performer` | Performers | (reserved for complex workers) |
+
+### Directory Structure
+```
+app/services/
+├── base_service.rb              # Base class with dry-monads
+├── result_wrapper.rb            # Backward-compatible Result wrapper
+├── types.rb                     # Type definitions
+├── concerns/
+│   └── sync/
+│       ├── connectionable.rb    # Connection validation
+│       ├── timeout_waitable.rb  # Timeout patterns
+│       └── error_handleable.rb  # Error handling
+└── sync/
+    ├── constants.rb             # Shared constants
+    │
+    │   # Main Services (entry points)
+    ├── dispatch_sync_jobs.rb    # Job dispatcher
+    ├── process_event.rb         # Event persistence
+    ├── sync_with_negentropy.rb  # Negentropy sync
+    ├── upload_events.rb         # Event upload
+    ├── recover_stale.rb         # Stale/error recovery
+    │
+    │   # Actions (internal commands)
+    ├── actions/
+    │   ├── build_filter.rb
+    │   ├── build_storage.rb
+    │   ├── dispatch_job.rb
+    │   ├── fetch_events.rb
+    │   ├── normalize_event_data.rb
+    │   ├── recover_stale_syncs.rb
+    │   └── retry_errored_syncs.rb
+    │
+    │   # Performers (complex workers)
+    └── performers/
+        └── process_reconciliation_results.rb
+```
+
+### Service Concerns
+Use concerns for shared behavior across services:
+- `Connectionable` - connection validation and access
+- `TimeoutWaitable` - thread-safe wait patterns
+- `ErrorHandleable` - error handling and status updates
+
+### When Creating New Services
+1. Determine tier: Main service, Action, or Performer
+2. Use `dry-initializer` option for typed parameters
+3. Return `Success(hash)` or `Failure(error)`
+4. Include relevant concerns for shared behavior
+5. Extract constants to `sync/constants.rb`
+
+### Reference Examples
+- Main service: `app/services/sync/process_event.rb`
+- Action: `app/services/sync/actions/fetch_events.rb`
+- Performer: `app/services/sync/performers/process_reconciliation_results.rb`
+- Concern: `app/services/concerns/sync/connectionable.rb`

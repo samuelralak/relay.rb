@@ -7,33 +7,37 @@ module Sync
     option :source_relay, type: Types::String.optional, default: -> { nil }
 
     def call
-      return { skipped: true, reason: "duplicate" } if event_exists?
+      return Success(skipped: true, reason: "duplicate") if event_exists?
 
       event = create_event
-      { success: true, event_id: event.event_id }
+      Success(success: true, event_id: event.event_id)
     rescue ActiveRecord::RecordInvalid => e
-      { success: false, error: e.message }
+      Failure(e.message)
     end
 
     private
+
+    def normalized_data
+      @normalized_data ||= Actions::NormalizeEventData.call(event_data:).value!
+    end
 
     def event_exists?
       Event.exists?(event_id:)
     end
 
     def event_id
-      event_data[:id] || event_data["id"]
+      normalized_data[:id]
     end
 
     def create_event
       Event.create!(
         event_id:,
-        pubkey: event_data[:pubkey] || event_data["pubkey"],
-        nostr_created_at: Time.at(event_data[:created_at] || event_data["created_at"]).utc,
-        kind: event_data[:kind] || event_data["kind"],
-        tags: event_data[:tags] || event_data["tags"] || [],
-        content: event_data[:content] || event_data["content"] || "",
-        sig: event_data[:sig] || event_data["sig"],
+        pubkey: normalized_data[:pubkey],
+        nostr_created_at: Time.at(normalized_data[:created_at]).utc,
+        kind: normalized_data[:kind],
+        tags: normalized_data[:tags] || [],
+        content: normalized_data[:content] || "",
+        sig: normalized_data[:sig],
         raw_event: event_data
       )
     end

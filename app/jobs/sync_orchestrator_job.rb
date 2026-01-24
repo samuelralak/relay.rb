@@ -9,7 +9,7 @@ class SyncOrchestratorJob < ApplicationJob
   def perform(mode: RelaySync::SyncMode::REALTIME)
     Rails.logger.info "[SyncOrchestratorJob] Starting orchestration (mode: #{mode})"
 
-    result = Sync::Orchestrator.call(mode:)
+    result = Sync::DispatchSyncJobs.call(mode:)
 
     Rails.logger.info "[SyncOrchestratorJob] Dispatched #{result[:dispatched]} sync job(s)"
   rescue StandardError => e
