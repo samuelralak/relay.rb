@@ -62,8 +62,8 @@ default: &default
       direction: down
     - url: wss://nos.lol
       enabled: true
-      backfill: false
-      negentropy: false
+      backfill: true
+      negentropy: true  # strfry 1.0.4
       direction: down
 
   sync:
