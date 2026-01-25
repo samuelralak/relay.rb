@@ -86,6 +86,6 @@ Style/RedundantSelfAssignment:
 Style/HashLikeCase:
   Enabled: true
 
-# Prefer symbols for hash keys
+# Prefer symbols for hash keys (disabled - string keys needed for JSON-like data)
 Style/StringHashKeys:
-  Enabled: true
+  Enabled: false

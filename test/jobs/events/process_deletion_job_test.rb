@@ -194,6 +194,52 @@ module Events
       end
     end
 
+    test "handles non-existent e-tag target gracefully" do
+      pubkey = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      deletion_event = create_deletion_event(
+        pubkey:,
+        tags: [ [ "e", "0000000000000000000000000000000000000000000000000000000000000000" ] ]
+      )
+
+      assert_nothing_raised do
+        ProcessDeletionJob.new.perform(deletion_event.id)
+      end
+    end
+
+    test "handles non-existent a-tag target gracefully" do
+      pubkey = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      deletion_event = create_deletion_event(
+        pubkey:,
+        tags: [ [ "a", "30023:#{pubkey}:non-existent-article" ] ]
+      )
+
+      assert_nothing_raised do
+        ProcessDeletionJob.new.perform(deletion_event.id)
+      end
+    end
+
+    test "processes both e-tags and a-tags in same deletion" do
+      pubkey = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+
+      # Create events in the past so deletion timestamp boundary is satisfied
+      regular_event = create_event(pubkey:, kind: 1, content: "Regular note", nostr_created_at: 1.hour.ago)
+      addressable_event = create_event(pubkey:, kind: 30023, d_tag: "mixed-test", nostr_created_at: 1.hour.ago)
+
+      deletion_event = create_deletion_event(
+        pubkey:,
+        tags: [
+          [ "e", regular_event.event_id ],
+          [ "a", "30023:#{pubkey}:mixed-test" ]
+        ]
+      )
+
+      ProcessDeletionJob.new.perform(deletion_event.id)
+
+      # Both events should be soft-deleted
+      assert_nil Event.find_by(event_id: regular_event.event_id)
+      assert_nil Event.find_by(event_id: addressable_event.event_id)
+    end
+
     # =========================================================================
     # Helpers
     # =========================================================================

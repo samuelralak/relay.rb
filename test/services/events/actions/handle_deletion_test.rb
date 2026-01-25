@@ -13,13 +13,13 @@ module Events
 
       def valid_deletion_event(overrides = {})
         {
-          id: overrides[:id] || SecureRandom.hex(32),
-          pubkey: overrides[:pubkey] || "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-          created_at: overrides[:created_at] || Time.current.to_i,
-          kind: 5,
-          tags: overrides[:tags] || [],
-          content: overrides[:content] || "deleted",
-          sig: SecureRandom.hex(64)
+          "id" => overrides[:id] || SecureRandom.hex(32),
+          "pubkey" => overrides[:pubkey] || "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "created_at" => overrides[:created_at] || Time.current.to_i,
+          "kind" => 5,
+          "tags" => overrides[:tags] || [],
+          "content" => overrides[:content] || "deleted",
+          "sig" => SecureRandom.hex(64)
         }
       end
 
