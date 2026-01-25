@@ -10,11 +10,26 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_01_23_194232) do
+ActiveRecord::Schema[8.1].define(version: 2026_01_25_195342) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pgcrypto"
   enable_extension "uuid-ossp"
+
+  create_table "api_keys", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.datetime "deleted_at"
+    t.string "key_digest", null: false
+    t.string "key_prefix", null: false
+    t.datetime "last_used_at"
+    t.string "name", null: false
+    t.datetime "revoked_at"
+    t.datetime "updated_at", null: false
+    t.index ["deleted_at"], name: "index_api_keys_on_deleted_at"
+    t.index ["key_digest"], name: "index_api_keys_on_key_digest", unique: true
+    t.index ["key_prefix"], name: "index_api_keys_on_key_prefix"
+    t.index ["revoked_at"], name: "index_api_keys_on_revoked_at"
+  end
 
   create_table "event_tags", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
     t.datetime "created_at", null: false
@@ -202,6 +217,20 @@ ActiveRecord::Schema[8.1].define(version: 2026_01_23_194232) do
     t.datetime "updated_at", null: false
     t.index ["relay_url", "filter_hash"], name: "idx_sync_states_relay_filter", unique: true
     t.index ["status"], name: "idx_sync_states_status"
+  end
+
+  create_table "upstream_relays", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.boolean "backfill", default: true
+    t.jsonb "config", default: {}
+    t.datetime "created_at", null: false
+    t.string "direction", default: "down"
+    t.boolean "enabled", default: true
+    t.boolean "negentropy", default: false
+    t.text "notes"
+    t.datetime "updated_at", null: false
+    t.string "url", null: false
+    t.index ["enabled"], name: "index_upstream_relays_on_enabled"
+    t.index ["url"], name: "index_upstream_relays_on_url", unique: true
   end
 
   add_foreign_key "event_tags", "events", on_delete: :cascade
