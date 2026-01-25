@@ -14,7 +14,7 @@ module RelayRb
     config.load_defaults 8.1
 
     # Autoload lib/ subdirectories, excluding non-Ruby directories
-    config.autoload_lib(ignore: %w[assets tasks negentropy relay_sync nostr_relay])
+    config.autoload_lib(ignore: %w[assets tasks negentropy relay_sync nostr_relay relay_search])
 
     # Add app/middleware to autoload paths (not included by default)
     # config.autoload_paths << Rails.root.join("app/middleware")

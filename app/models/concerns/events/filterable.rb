@@ -47,7 +47,26 @@ module Events
         return false unless tag_matches?(tag_name, tag_values)
       end
 
+      # NIP-50: Check search filter (simple term matching for live events)
+      search_query = filter[:search] || filter["search"]
+      return false if search_query.present? && !content_matches_search?(search_query)
+
       true
+    end
+
+    # NIP-50: Simple term matching for live subscription search
+    def content_matches_search?(search_query)
+      return true if search_query.blank?
+
+      content_lower = content.to_s.downcase
+
+      # Extract simple terms (ignore extensions and exclusions for live matching)
+      terms = search_query.downcase.split.reject { |term|
+        term.start_with?("-") || term.include?(":")
+      }
+
+      # All terms must be present (AND logic)
+      terms.all? { |term| content_lower.include?(term) }
     end
 
     private

@@ -7,7 +7,7 @@ Rails.application.config.relay_info = {
   description: ENV.fetch("RELAY_DESCRIPTION", "A Nostr relay built with Ruby on Rails"),
   pubkey: ENV["RELAY_PUBKEY"],
   contact: ENV["RELAY_CONTACT"],
-  supported_nips: [ 1, 9, 11, 40 ],
+  supported_nips: [ 1, 9, 11, 40, 50 ],
   software: "https://github.com/samuelralak/relay_rb",
   version: "0.1.0",
   limitation: {
@@ -20,7 +20,9 @@ Rails.application.config.relay_info = {
     max_content_length: 65_535,
     default_limit: 500,
     auth_required: false,
-    payment_required: false
+    payment_required: false,
+    search_query_max_length: 256,  # NIP-50
+    search_max_limit: 500          # NIP-50
   }
 }
 

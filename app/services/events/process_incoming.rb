@@ -23,10 +23,21 @@ module Events
 
       # 4. Broadcast to subscribers (result is the saved Event)
       NostrRelay::Subscriptions.broadcast(result) if result
+
+      # 5. NIP-50: Enqueue for search indexing if OpenSearch is enabled
+      enqueue_search_indexing(result) if result.is_a?(Event)
+
       Success(event_id: @data["id"])
     end
 
     private
+
+    # NIP-50: Enqueue event for search indexing
+    def enqueue_search_indexing(event)
+      return unless RelaySearch::Client.enabled?
+
+      Search::IndexEventJob.perform_later(id: event.id)
+    end
 
     def handle_by_kind
       kind = @data["kind"]

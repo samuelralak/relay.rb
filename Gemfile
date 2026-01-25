@@ -72,3 +72,6 @@ gem "nostr", "~> 0.7"
 
 # Thread-safe data structures for WebSocket connections
 gem "concurrent-ruby", "~> 1.2"
+
+# NIP-50: OpenSearch for full-text search
+gem "opensearch-ruby", "~> 3.0"

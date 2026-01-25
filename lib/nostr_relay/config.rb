@@ -27,7 +27,9 @@ module NostrRelay
       max_event_tags: 100,
       max_content_length: 65_535,
       default_limit: 500,
-      created_at_grace_period: 900 # 15 minutes tolerance for future timestamps
+      created_at_grace_period: 900, # 15 minutes tolerance for future timestamps
+      search_query_max_length: 256, # NIP-50: Maximum search query length
+      search_max_limit: 500         # NIP-50: Maximum search results
     }.freeze
 
     class << self
@@ -83,6 +85,11 @@ module NostrRelay
       def created_at_grace_period = limit_value(:created_at_grace_period)
       def auth_required?        = limit_value(:auth_required, false)
       def payment_required?     = limit_value(:payment_required, false)
+
+      # NIP-50: Search configuration
+      def search_enabled?           = RelaySearch::Client.available? rescue false
+      def search_query_max_length   = limit_value(:search_query_max_length)
+      def search_max_limit          = limit_value(:search_max_limit)
 
       # Relay metadata accessors
       def name           = metadata(:name)

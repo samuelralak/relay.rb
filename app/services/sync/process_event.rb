@@ -12,12 +12,23 @@ module Sync
 
       event = create_event
       NostrRelay::Subscriptions.broadcast(event) if broadcast
+
+      # NIP-50: Enqueue for search indexing if OpenSearch is enabled
+      enqueue_search_indexing(event)
+
       Success(success: true, event_id: event.event_id)
     rescue ActiveRecord::RecordInvalid => e
       Failure(e.message)
     end
 
     private
+
+    # NIP-50: Enqueue event for search indexing
+    def enqueue_search_indexing(event)
+      return unless RelaySearch::Client.enabled?
+
+      Search::IndexEventJob.perform_later(id: event.id)
+    end
 
     def normalized_data
       @normalized_data ||= Actions::NormalizeEventData.call(event_data:).value!

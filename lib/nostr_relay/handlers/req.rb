@@ -42,11 +42,52 @@ module NostrRelay
       end
 
       def send_historical_events(connection, sub_id, filters)
-        # Query events via configured repository adapter
-        # Repository is responsible for column selection and query optimization
-        # Use smallest limit from filters, capped at max_limit
         limit = extract_limit(filters)
 
+        if has_search_filter?(filters)
+          send_search_results(connection, sub_id, filters, limit)
+        else
+          send_database_results(connection, sub_id, filters, limit)
+        end
+      end
+
+      def has_search_filter?(filters)
+        filters.any? { |f| f[:search].present? || f["search"].present? }
+      end
+
+      def send_search_results(connection, sub_id, filters, limit)
+        # Search filters handled separately from non-search filters
+        search_filters, regular_filters = filters.partition { |f| f[:search].present? || f["search"].present? }
+
+        # Process search filters (relevance-ordered results)
+        search_filters.each do |filter|
+          search_query = filter[:search] || filter["search"]
+          result = Search::ExecuteSearch.call(
+            search_query:,
+            filter: filter.except(:search, "search", :limit, "limit").symbolize_keys,
+            limit:
+          )
+
+          if result.success?
+            result.value![:events].each do |event|
+              connection.send_event(sub_id, Config.event_serializer.serialize(event))
+            end
+          elsif result.failure == :search_disabled
+            # Fallback: treat as regular filter without search
+            regular_filters << filter.except(:search, "search")
+          end
+          # :search_error or :empty_query silently returns no results
+        end
+
+        # Process regular filters if any
+        send_database_results(connection, sub_id, regular_filters, limit) if regular_filters.any?
+      end
+
+      def send_database_results(connection, sub_id, filters, limit)
+        return if filters.empty?
+
+        # Query events via configured repository adapter
+        # Repository is responsible for column selection and query optimization
         events = Config.event_repository
                    .matching_filters(filters)
                    .limit(limit)

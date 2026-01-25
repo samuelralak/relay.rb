@@ -15,6 +15,7 @@ module NostrRelay
         optional(:since).filled(:integer)
         optional(:until).filled(:integer)
         optional(:limit).filled(:integer)
+        optional(:search).filled(:string)  # NIP-50: Search filter
       end
 
       rule(:ids).each do
@@ -28,6 +29,12 @@ module NostrRelay
       rule(:limit) do
         max_limit = Config.max_limit
         key.failure("must be <= #{max_limit}") if value && value > max_limit
+      end
+
+      # NIP-50: Validate search query length
+      rule(:search) do
+        max_length = Config.search_query_max_length
+        key.failure("must be <= #{max_length} characters") if value && value.length > max_length
       end
 
       # NIP-01: #e and #p tag filters must contain 64-char lowercase hex values
