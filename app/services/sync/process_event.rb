@@ -5,11 +5,13 @@ module Sync
   class ProcessEvent < BaseService
     option :event_data, type: Types::Hash
     option :source_relay, type: Types::String.optional, default: -> { nil }
+    option :broadcast, type: Types::Bool, default: -> { false }
 
     def call
       return Success(skipped: true, reason: "duplicate") if event_exists?
 
       event = create_event
+      NostrRelay::Subscriptions.broadcast(event) if broadcast
       Success(success: true, event_id: event.event_id)
     rescue ActiveRecord::RecordInvalid => e
       Failure(e.message)

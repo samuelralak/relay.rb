@@ -180,5 +180,84 @@ module Sync
       event = Event.find_by(event_id: event_data[:id])
       assert_equal [], event.tags
     end
+
+    # =========================================================================
+    # Broadcast Behavior
+    # =========================================================================
+
+    test "does not broadcast by default" do
+      event_data = valid_event_data
+
+      # Set up tracking via connection and subscription
+      connection = NostrTestHelpers::MockConnection.new
+      NostrRelay::Subscriptions.reset!
+      NostrRelay::Subscriptions.register(connection)
+      NostrRelay::Subscriptions.subscribe(
+        connection_id: connection.id,
+        sub_id: "test-sub",
+        filters: [ { kinds: [ 1 ] } ]
+      )
+      connection.clear!
+
+      ProcessEvent.call(event_data:)
+
+      # No EVENT messages should be sent - no broadcast happened
+      event_messages = connection.sent_messages.select { |m| m[0] == "EVENT" }
+      assert_empty event_messages, "Expected no broadcast without broadcast: true"
+
+      NostrRelay::Subscriptions.reset!
+    end
+
+    test "broadcasts when broadcast: true" do
+      event_data = valid_event_data
+
+      # Set up tracking via connection and subscription
+      connection = NostrTestHelpers::MockConnection.new
+      NostrRelay::Subscriptions.reset!
+      NostrRelay::Subscriptions.register(connection)
+      NostrRelay::Subscriptions.subscribe(
+        connection_id: connection.id,
+        sub_id: "test-sub",
+        filters: [ { kinds: [ 1 ] } ]
+      )
+      connection.clear!
+
+      ProcessEvent.call(event_data:, broadcast: true)
+
+      # EVENT message should be sent
+      event_messages = connection.sent_messages.select { |m| m[0] == "EVENT" }
+      assert_equal 1, event_messages.count, "Expected one broadcast with broadcast: true"
+      assert_equal event_data[:id], event_messages.first[2][:id]
+
+      NostrRelay::Subscriptions.reset!
+    end
+
+    test "does not broadcast for duplicates even when broadcast: true" do
+      event_data = valid_event_data
+
+      # Create the event first (no broadcast)
+      ProcessEvent.call(event_data:)
+
+      # Set up tracking
+      connection = NostrTestHelpers::MockConnection.new
+      NostrRelay::Subscriptions.reset!
+      NostrRelay::Subscriptions.register(connection)
+      NostrRelay::Subscriptions.subscribe(
+        connection_id: connection.id,
+        sub_id: "test-sub",
+        filters: [ { kinds: [ 1 ] } ]
+      )
+      connection.clear!
+
+      # Try to create again with broadcast: true
+      result = ProcessEvent.call(event_data:, broadcast: true)
+      assert result.value![:skipped]
+
+      # No EVENT messages should be sent - duplicate was skipped
+      event_messages = connection.sent_messages.select { |m| m[0] == "EVENT" }
+      assert_empty event_messages, "Expected no broadcast for duplicates"
+
+      NostrRelay::Subscriptions.reset!
+    end
   end
 end

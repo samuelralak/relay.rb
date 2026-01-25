@@ -185,8 +185,12 @@ module Sync
         )
       end
 
-      # Queue event for processing
-      Events::ProcessJob.perform_later(event_data.to_json, @relay_url)
+      # Queue event for processing - broadcast only for realtime sync
+      Events::ProcessJob.perform_later(event_data.to_json, @relay_url, broadcast: realtime_mode?)
+    end
+
+    def realtime_mode?
+      @mode == RelaySync::SyncMode::REALTIME
     end
 
     def connection

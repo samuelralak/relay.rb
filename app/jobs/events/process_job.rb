@@ -10,12 +10,14 @@ module Events
 
     # @param event_json [String] JSON string of the event
     # @param source_relay [String, nil] URL of the relay that sent this event
-    def perform(event_json, source_relay = nil)
+    # @param broadcast [Boolean] Whether to broadcast to subscribers (default: false)
+    def perform(event_json, source_relay = nil, broadcast: false)
       event_data = JSON.parse(event_json, symbolize_names: true)
 
       result = ::Sync::ProcessEvent.call(
         event_data:,
-        source_relay:
+        source_relay:,
+        broadcast:
       )
 
       if result.success?
