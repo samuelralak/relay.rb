@@ -23,24 +23,24 @@ module Search
         result = ParseQuery.call(query: '"lightning network" bitcoin')
 
         assert result.success?
-        assert_equal ["lightning network"], result.value![:phrases]
-        assert_equal ["bitcoin"], result.value![:terms]
+        assert_equal [ "lightning network" ], result.value![:phrases]
+        assert_equal [ "bitcoin" ], result.value![:terms]
       end
 
       test "parses exclusions" do
         result = ParseQuery.call(query: "bitcoin -scam")
 
         assert result.success?
-        assert_equal ["bitcoin"], result.value![:terms]
-        assert_equal ["scam"], result.value![:exclusions]
+        assert_equal [ "bitcoin" ], result.value![:terms]
+        assert_equal [ "scam" ], result.value![:exclusions]
       end
 
       test "parses excluded phrases" do
         result = ParseQuery.call(query: 'bitcoin -"pump and dump"')
 
         assert result.success?
-        assert_equal ["bitcoin"], result.value![:terms]
-        assert_equal ["pump and dump"], result.value![:excluded_phrases]
+        assert_equal [ "bitcoin" ], result.value![:terms]
+        assert_equal [ "pump and dump" ], result.value![:excluded_phrases]
       end
 
       test "parses extensions" do
@@ -58,16 +58,16 @@ module Search
         result = ParseQuery.call(query: "bitcoin from:#{KNOWN_NPUB}")
 
         assert result.success?
-        assert_equal ["bitcoin"], result.value![:terms]
-        assert_equal [KNOWN_HEX], result.value![:from_authors]
+        assert_equal [ "bitcoin" ], result.value![:terms]
+        assert_equal [ KNOWN_HEX ], result.value![:from_authors]
       end
 
       test "parses from: extension with hex pubkey" do
         result = ParseQuery.call(query: "bitcoin from:#{KNOWN_HEX}")
 
         assert result.success?
-        assert_equal ["bitcoin"], result.value![:terms]
-        assert_equal [KNOWN_HEX], result.value![:from_authors]
+        assert_equal [ "bitcoin" ], result.value![:terms]
+        assert_equal [ KNOWN_HEX ], result.value![:from_authors]
       end
 
       test "parses from: extension with multiple comma-separated pubkeys" do
@@ -75,7 +75,7 @@ module Search
         result = ParseQuery.call(query: "bitcoin from:#{KNOWN_HEX},#{hex2}")
 
         assert result.success?
-        assert_equal [KNOWN_HEX, hex2], result.value![:from_authors]
+        assert_equal [ KNOWN_HEX, hex2 ], result.value![:from_authors]
       end
 
       test "ignores invalid pubkeys in from: extension" do
@@ -83,7 +83,7 @@ module Search
 
         assert result.success?
         # Only valid pubkey is included
-        assert_equal [KNOWN_HEX], result.value![:from_authors]
+        assert_equal [ KNOWN_HEX ], result.value![:from_authors]
       end
 
       test "returns empty array when from: has only invalid pubkeys" do
@@ -105,17 +105,17 @@ module Search
       # =========================================================================
 
       test "parses complex query with all features" do
-        query = %{bitcoin "lightning network" -scam -"pump and dump" from:#{KNOWN_NPUB} include:spam}
-        result = ParseQuery.call(query: query)
+        query = %(bitcoin "lightning network" -scam -"pump and dump" from:#{KNOWN_NPUB} include:spam)
+        result = ParseQuery.call(query:)
 
         assert result.success?
         values = result.value!
 
-        assert_equal ["bitcoin"], values[:terms]
-        assert_equal ["lightning network"], values[:phrases]
-        assert_equal ["scam"], values[:exclusions]
-        assert_equal ["pump and dump"], values[:excluded_phrases]
-        assert_equal [KNOWN_HEX], values[:from_authors]
+        assert_equal [ "bitcoin" ], values[:terms]
+        assert_equal [ "lightning network" ], values[:phrases]
+        assert_equal [ "scam" ], values[:exclusions]
+        assert_equal [ "pump and dump" ], values[:excluded_phrases]
+        assert_equal [ KNOWN_HEX ], values[:from_authors]
         assert_equal "spam", values[:extensions]["include"]
       end
     end

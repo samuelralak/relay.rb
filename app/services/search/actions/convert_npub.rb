@@ -15,9 +15,9 @@ module Search
 
         hex = if npub?
                 decode_npub
-              elsif valid_hex?
+        elsif valid_hex?
                 identifier.downcase
-              end
+        end
 
         return Failure(:invalid_pubkey) unless hex
 

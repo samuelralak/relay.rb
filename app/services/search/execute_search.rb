@@ -73,9 +73,9 @@ module Search
       merged_authors = if existing_authors
                          # Intersection: both filter and from: must match
                          existing_authors & from_authors
-                       else
+      else
                          from_authors
-                       end
+      end
 
       base_filter.merge(authors: merged_authors)
     end

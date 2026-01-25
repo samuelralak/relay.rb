@@ -13,7 +13,7 @@ module Search
           phrases: extract_phrases,
           exclusions: extract_exclusions,
           excluded_phrases: extract_excluded_phrases,
-          extensions: extensions,
+          extensions:,
           from_authors: extract_from_authors(extensions)
         )
       end
@@ -61,7 +61,7 @@ module Search
         identifiers = from_value.split(",").map(&:strip).reject(&:blank?)
 
         identifiers.filter_map do |identifier|
-          result = ConvertNpub.call(identifier: identifier)
+          result = ConvertNpub.call(identifier:)
           result.success? ? result.value![:pubkey] : nil
         end
       end
