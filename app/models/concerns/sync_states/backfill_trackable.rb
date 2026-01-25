@@ -64,7 +64,24 @@ module SyncStates
     # Initialize polling backfill (forward direction).
     # @param from [Time] the oldest timestamp to start backfilling from
     def initialize_polling_backfill!(from:)
-      return if backfill_target.present? # Already initialized
+      # If already initialized with correct forward direction, skip
+      if backfill_target.present?
+        # Detect wrong direction: backfill_until was set near Time.current (backwards init)
+        # but should be at backfill_target for forward sync.
+        # Only reset if:
+        # 1. Sync is not already complete (polling_backfill_complete? is false)
+        # 2. backfill_until is very close to now (within 2 hours) - suggests just initialized
+        # 3. backfill_target is significantly in the past (> 1 week) - meaningful backfill
+        if backfill_until &&
+           !polling_backfill_complete? &&
+           backfill_until > Time.current - 2.hours &&
+           backfill_target < Time.current - 1.week
+          Rails.logger.info "[BackfillTrackable] Reinitializing #{relay_url} for forward sync " \
+                            "(was: #{backfill_until}, resetting to: #{backfill_target})"
+          update!(backfill_until: backfill_target)
+        end
+        return
+      end
 
       update!(
         backfill_target: from,  # The oldest point (where we started)
