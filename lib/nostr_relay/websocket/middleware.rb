@@ -11,7 +11,7 @@ module NostrRelay
 
       def call(env)
         if Faye::WebSocket.websocket?(env)
-          ws = Faye::WebSocket.new(env)
+          ws = Faye::WebSocket.new(env, nil, websocket_options)
           connection = NostrRelay::Connection.new(ws)
 
           ws.on :open do |_event|
@@ -30,6 +30,15 @@ module NostrRelay
         else
           @app.call(env)
         end
+      end
+
+      private
+
+      def websocket_options
+        options = {}
+        ping_interval = NostrRelay::Config.ping_interval
+        options[:ping] = ping_interval if ping_interval&.positive?
+        options
       end
     end
   end

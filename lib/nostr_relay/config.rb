@@ -29,7 +29,8 @@ module NostrRelay
       default_limit: 500,
       created_at_grace_period: 900, # 15 minutes tolerance for future timestamps
       search_query_max_length: 256, # NIP-50: Maximum search query length
-      search_max_limit: 500         # NIP-50: Maximum search results
+      search_max_limit: 500,        # NIP-50: Maximum search results
+      ping_interval: 30             # WebSocket ping interval in seconds (keeps connections alive)
     }.freeze
 
     class << self
@@ -83,6 +84,7 @@ module NostrRelay
       def max_content_length    = limit_value(:max_content_length)
       def default_limit         = limit_value(:default_limit)
       def created_at_grace_period = limit_value(:created_at_grace_period)
+      def ping_interval         = limit_value(:ping_interval)
       def auth_required?        = limit_value(:auth_required, false)
       def payment_required?     = limit_value(:payment_required, false)
 
