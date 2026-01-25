@@ -91,18 +91,20 @@ test:
 production:
   primary: &primary_production
     <<: *default
-    database: relay_rb_production
-    username: <%= ENV.fetch("DATABASE_USERNAME") { "postgres" } %>
-    password: <%= ENV.fetch("DATABASE_PASSWORD") { "" } %>
+    url: <%= ENV["DATABASE_URL"] %>
+  primary_replica:
+    <<: *primary_production
+    url: <%= ENV["DATABASE_REPLICA_URL"] %>
+    replica: true
   cache:
     <<: *primary_production
-    database: relay_rb_production_cache
+    url: <%= ENV.fetch("CACHE_DATABASE_URL") { ENV["DATABASE_URL"] } %>
     migrations_paths: db/cache_migrate
   queue:
     <<: *primary_production
-    database: relay_rb_production_queue
+    url: <%= ENV.fetch("QUEUE_DATABASE_URL") { ENV["DATABASE_URL"] } %>
     migrations_paths: db/queue_migrate
   cable:
     <<: *primary_production
-    database: relay_rb_production_cable
+    url: <%= ENV.fetch("CABLE_DATABASE_URL") { ENV["DATABASE_URL"] } %>
     migrations_paths: db/cable_migrate
