@@ -63,7 +63,7 @@ default: &default
     - url: wss://nos.lol
       enabled: true
       backfill: true
-      negentropy: true  # strfry 1.0.4
+      negentropy: false  # strfry 1.0.4, but negentropy disabled on this instance
       direction: down
 
   sync:
