@@ -71,83 +71,42 @@ module NostrRelay
         raise ConfigurationError, "Missing required adapters: #{missing.join(', ')}"
       end
 
-      # Access the limitation section
-      def limitation
-        (relay_info || {})[:limitation] || {}
-      end
-
-      # Individual limit accessors with sensible defaults
-      def max_message_length
-        limitation[:max_message_length] || DEFAULTS[:max_message_length]
-      end
-
-      def max_subscriptions
-        limitation[:max_subscriptions] || DEFAULTS[:max_subscriptions]
-      end
-
-      def max_subid_length
-        limitation[:max_subid_length] || DEFAULTS[:max_subid_length]
-      end
-
-      def max_filters
-        limitation[:max_filters] || DEFAULTS[:max_filters]
-      end
-
-      def max_limit
-        limitation[:max_limit] || DEFAULTS[:max_limit]
-      end
-
-      def max_event_tags
-        limitation[:max_event_tags] || DEFAULTS[:max_event_tags]
-      end
-
-      def max_content_length
-        limitation[:max_content_length] || DEFAULTS[:max_content_length]
-      end
-
-      def default_limit
-        limitation[:default_limit] || DEFAULTS[:default_limit]
-      end
-
-      def created_at_grace_period
-        limitation[:created_at_grace_period] || DEFAULTS[:created_at_grace_period]
-      end
-
-      def auth_required?
-        limitation[:auth_required] || false
-      end
-
-      def payment_required?
-        limitation[:payment_required] || false
-      end
+      # Limitation accessors (with defaults from DEFAULTS)
+      def max_message_length    = limit_value(:max_message_length)
+      def max_subscriptions     = limit_value(:max_subscriptions)
+      def max_subid_length      = limit_value(:max_subid_length)
+      def max_filters           = limit_value(:max_filters)
+      def max_limit             = limit_value(:max_limit)
+      def max_event_tags        = limit_value(:max_event_tags)
+      def max_content_length    = limit_value(:max_content_length)
+      def default_limit         = limit_value(:default_limit)
+      def created_at_grace_period = limit_value(:created_at_grace_period)
+      def auth_required?        = limit_value(:auth_required, false)
+      def payment_required?     = limit_value(:payment_required, false)
 
       # Relay metadata accessors
-      def name
-        (relay_info || {})[:name]
+      def name           = metadata(:name)
+      def description    = metadata(:description)
+      def pubkey         = metadata(:pubkey)
+      def contact        = metadata(:contact)
+      def supported_nips = metadata(:supported_nips, [])
+      def software       = metadata(:software)
+      def version        = metadata(:version)
+
+      private
+
+      # Fetch limitation value with fallback to DEFAULTS
+      # Uses nil? checks to properly handle explicit false values
+      def limit_value(key, default = nil)
+        value = relay_info&.dig(:limitation, key)
+        return value unless value.nil?
+        default.nil? ? DEFAULTS[key] : default
       end
 
-      def description
-        (relay_info || {})[:description]
-      end
-
-      def pubkey
-        (relay_info || {})[:pubkey]
-      end
-
-      def contact
-        (relay_info || {})[:contact]
-      end
-
-      def supported_nips
-        (relay_info || {})[:supported_nips] || []
-      end
-
-      def software
-        (relay_info || {})[:software]
-      end
-
-      def version
-        (relay_info || {})[:version]
+      # Fetch relay metadata with optional default
+      def metadata(key, default = nil)
+        value = relay_info&.dig(key)
+        value.nil? ? default : value
       end
     end
   end
