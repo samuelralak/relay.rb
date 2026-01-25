@@ -280,6 +280,20 @@ class EventTest < ActiveSupport::TestCase
     Event.matching_filter(kinds: [ 1 ]).each { |e| assert_not e.expired? }
   end
 
+  test "matches_filter? returns false for expired events" do
+    expired = events(:expired_event)
+    filter = { kinds: [1] }
+
+    assert_not expired.matches_filter?(filter)
+  end
+
+  test "matches_filter? returns true for non-expired events" do
+    event = events(:text_note)
+    filter = { kinds: [1] }
+
+    assert event.matches_filter?(filter)
+  end
+
   # =========================================
   # Soft Delete (Paranoia)
   # =========================================

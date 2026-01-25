@@ -1,16 +1,17 @@
 # Solid Queue Configuration
 #
 # Queue priority (highest to lowest):
-#   1. sync    - Sync orchestration, Negentropy, polling (must run promptly)
-#   2. events  - Event processing (can be delayed behind sync jobs)
-#   3. uploads - Uploading to relays (lowest priority)
+#   1. sync      - Sync orchestration, Negentropy, polling (must run promptly)
+#   2. events    - Event processing (can be delayed behind sync jobs)
+#   3. deletions - NIP-09 deletion processing (lower priority than events)
+#   4. uploads   - Uploading to relays (lowest priority)
 
 default: &default
   dispatchers:
     - polling_interval: 1
       batch_size: 500
   workers:
-    - queues: [sync, events, uploads]
+    - queues: [sync, events, deletions, uploads]
       threads: 3
       processes: 1
       polling_interval: 0.1
@@ -24,7 +25,7 @@ test:
 production:
   <<: *default
   workers:
-    - queues: [sync, events, uploads]
+    - queues: [sync, events, deletions, uploads]
       threads: 5
       processes: 2
       polling_interval: 0.1

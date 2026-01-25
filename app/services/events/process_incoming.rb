@@ -11,7 +11,7 @@ module Events
       @data = event_data.transform_keys(&:to_s)
 
       # 1. Verify ID and signature
-      yield VerifySignature.call(event_data: @data)
+      yield Actions::VerifySignature.call(event_data: @data)
 
       # 2. Handle by kind (regular/replaceable/ephemeral/addressable)
       # Note: duplicate detection is handled by database unique constraint
@@ -35,12 +35,15 @@ module Events
         # Don't store, just broadcast in-memory
         NostrRelay::Subscriptions.broadcast_ephemeral(@data)
         Success(nil)
+      elsif kind == ::Events::Kinds::DELETION
+        # NIP-09: Handle deletion requests (stores event + enqueues deletion job)
+        Actions::HandleDeletion.call(event_data: @data)
       elsif ::Events::Kinds.replaceable?(kind)
-        StoreReplaceable.call(event_data: @data)
+        Actions::StoreReplaceable.call(event_data: @data)
       elsif ::Events::Kinds.addressable?(kind)
-        StoreAddressable.call(event_data: @data)
+        Actions::StoreAddressable.call(event_data: @data)
       else
-        StoreRegular.call(event_data: @data)
+        Actions::StoreRegular.call(event_data: @data)
       end
     end
   end

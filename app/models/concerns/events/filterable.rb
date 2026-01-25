@@ -18,6 +18,9 @@ module Events
     # Instance method for subscription matching (live events)
     # Checks if this event matches a given filter
     def matches_filter?(filter)
+      # NIP-40: Don't match expired events
+      return false if expired?
+
       filter = filter.with_indifferent_access
 
       # Check ids

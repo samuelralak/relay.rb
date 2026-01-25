@@ -60,6 +60,17 @@ module NostrRelay
         max_len = Config.max_content_length
         key.failure("too large (max #{max_len} bytes)") if value.bytesize > max_len
       end
+
+      # NIP-40: Reject events that have already expired
+      rule(:tags) do
+        expiration_tag = value&.find { |t| t.is_a?(Array) && t[0] == "expiration" }
+        next unless expiration_tag
+
+        expiration_ts = expiration_tag[1]&.to_i
+        next unless expiration_ts && expiration_ts > 0
+
+        key.failure("event has expired") if expiration_ts <= Time.now.to_i
+      end
     end
   end
 end
