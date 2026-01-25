@@ -46,10 +46,11 @@ module Events
 
       def signature_valid?
         # Use the nostr gem's crypto utilities for BIP-340 Schnorr verification
-        Nostr::Crypto.valid_sig?(
+        crypto = Nostr::Crypto.new
+        crypto.valid_sig?(
           @data["id"],
-          @data["pubkey"],
-          @data["sig"]
+          Nostr::PublicKey.new(@data["pubkey"]),
+          Nostr::Signature.new(@data["sig"])
         )
       rescue StandardError => e
         Rails.logger.error("Signature verification error: #{e.message}")

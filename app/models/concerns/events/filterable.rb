@@ -128,8 +128,12 @@ module Events
         if queries.size == 1
           queries.first
         else
-          # Combine all queries with UNION and wrap in subquery
-          combined = queries.map(&:arel).reduce { |acc, q| acc.union(q) }
+          # Combine all queries with UNION using Arel::Nodes::Union
+          arel_queries = queries.map(&:arel)
+          combined = arel_queries.first
+          arel_queries[1..].each do |q|
+            combined = Arel::Nodes::Union.new(combined, q)
+          end
           from(Arel::Nodes::TableAlias.new(combined, :events)).newest_first
         end
       end
