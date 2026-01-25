@@ -24,12 +24,11 @@ Rails.application.config.relay_info = {
   }
 }
 
-# Configure NostrRelay library with relay info and logger
-NostrRelay::Config.relay_info = Rails.application.config.relay_info
-NostrRelay::Config.logger = Rails.logger
-
-# Configure adapters after models are loaded
+# Configure NostrRelay library after Rails loads
 Rails.application.config.after_initialize do
+  NostrRelay::Config.relay_info = Rails.application.config.relay_info
+  NostrRelay::Config.logger = Rails.logger
+
   NostrRelay::Config.configure do |config|
     # Adapters - application provides implementations matching expected API
     config.event_repository = Event                    # responds to .matching_filters(filters)

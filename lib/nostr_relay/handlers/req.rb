@@ -44,13 +44,25 @@ module NostrRelay
       def send_historical_events(connection, sub_id, filters)
         # Query events via configured repository adapter
         # Repository is responsible for column selection and query optimization
+        # Use smallest limit from filters, capped at max_limit
+        limit = extract_limit(filters)
+
         events = Config.event_repository
                    .matching_filters(filters)
-                   .limit(Config.max_limit)
+                   .limit(limit)
 
         events.each do |event|
           connection.send_event(sub_id, Config.event_serializer.serialize(event))
         end
+      end
+
+      def extract_limit(filters)
+        # Find the smallest limit specified in any filter, or use default
+        filter_limits = filters.filter_map { |f| f[:limit] || f["limit"] }
+        requested_limit = filter_limits.min || Config.default_limit
+
+        # Cap at max_limit
+        [ requested_limit, Config.max_limit ].min
       end
     end
   end

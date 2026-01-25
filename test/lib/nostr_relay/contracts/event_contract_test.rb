@@ -136,6 +136,52 @@ module NostrRelay
         assert result.failure?
         assert result.errors[:kind].present?
       end
+
+      # =========================================================================
+      # NIP-11 Limits
+      # =========================================================================
+
+      test "rejects events exceeding max_event_tags" do
+        max_tags = NostrRelay::Config.max_event_tags
+        too_many_tags = (max_tags + 1).times.map { [ "p", SecureRandom.hex(32) ] }
+        event_data = valid_event(tags: too_many_tags)
+
+        result = EventContract.new.call(event_data)
+
+        assert result.failure?
+        assert result.errors[:tags].any? { |e| e.include?("too many tags") }
+      end
+
+      test "accepts events at max_event_tags limit" do
+        max_tags = NostrRelay::Config.max_event_tags
+        tags = max_tags.times.map { [ "p", SecureRandom.hex(32) ] }
+        event_data = valid_event(tags:)
+
+        result = EventContract.new.call(event_data)
+
+        assert_not result.errors[:tags]&.any? { |e| e.include?("too many tags") }
+      end
+
+      test "rejects content exceeding max_content_length" do
+        max_len = NostrRelay::Config.max_content_length
+        large_content = "x" * (max_len + 1)
+        event_data = valid_event(content: large_content)
+
+        result = EventContract.new.call(event_data)
+
+        assert result.failure?
+        assert result.errors[:content].any? { |e| e.include?("too large") }
+      end
+
+      test "accepts content at max_content_length limit" do
+        max_len = NostrRelay::Config.max_content_length
+        content = "x" * max_len
+        event_data = valid_event(content:)
+
+        result = EventContract.new.call(event_data)
+
+        assert_not result.errors[:content]&.any? { |e| e.include?("too large") }
+      end
     end
   end
 end

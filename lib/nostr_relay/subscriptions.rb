@@ -96,6 +96,12 @@ module NostrRelay
         dead_connections.each { |conn_id| unregister(conn_id) }
       end
 
+      # For testing: reset all state
+      def reset!
+        @connections = Concurrent::Hash.new
+        @subscriptions = Concurrent::Hash.new { |h, k| h[k] = Concurrent::Hash.new }
+      end
+
       private
 
       # Returns true on success, false if connection is dead
@@ -105,12 +111,6 @@ module NostrRelay
       rescue StandardError => e
         Config.logger.error("[NostrRelay] Broadcast error to connection #{connection.id}: #{e.message}")
         false
-      end
-
-      # For testing: reset all state
-      def reset!
-        @connections = Concurrent::Hash.new
-        @subscriptions = Concurrent::Hash.new { |h, k| h[k] = Concurrent::Hash.new }
       end
     end
   end

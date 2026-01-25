@@ -1,6 +1,86 @@
 # frozen_string_literal: true
 
 module NostrTestHelpers
+  # Mock WebSocket for testing
+  class MockWebSocket
+    attr_reader :messages, :closed
+
+    def initialize
+      @messages = []
+      @closed = false
+    end
+
+    def send(data)
+      @messages << data
+    end
+
+    def close
+      @closed = true
+    end
+
+    def last_message
+      @messages.last
+    end
+
+    def last_message_parsed
+      JSON.parse(last_message) if last_message
+    end
+
+    def clear!
+      @messages.clear
+    end
+  end
+
+  # Mock Connection wrapping MockWebSocket for NostrRelay testing
+  class MockConnection
+    attr_reader :id, :ws, :sent_messages
+
+    def initialize
+      @id = SecureRandom.uuid
+      @ws = MockWebSocket.new
+      @sent_messages = []
+    end
+
+    def send_event(sub_id, event)
+      msg = [ "EVENT", sub_id, event ]
+      @sent_messages << msg
+      @ws.send(msg.to_json)
+    end
+
+    def send_ok(event_id, success, message = "")
+      msg = [ "OK", event_id, success, message ]
+      @sent_messages << msg
+      @ws.send(msg.to_json)
+    end
+
+    def send_eose(sub_id)
+      msg = [ "EOSE", sub_id ]
+      @sent_messages << msg
+      @ws.send(msg.to_json)
+    end
+
+    def send_closed(sub_id, message)
+      msg = [ "CLOSED", sub_id, message ]
+      @sent_messages << msg
+      @ws.send(msg.to_json)
+    end
+
+    def send_notice(message)
+      msg = [ "NOTICE", message ]
+      @sent_messages << msg
+      @ws.send(msg.to_json)
+    end
+
+    def last_sent
+      @sent_messages.last
+    end
+
+    def clear!
+      @sent_messages.clear
+      @ws.clear!
+    end
+  end
+
   # Valid hex strings for testing
   HEX_64 = "a" * 64
   HEX_64_ALT = "b" * 64
