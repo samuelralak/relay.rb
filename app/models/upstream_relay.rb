@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 class UpstreamRelay < ApplicationRecord
-  URL_FORMAT = /\Awss?:\/\/.+/
+  URL_FORMAT = /\Awss?:\/\/.+\z/
 
   validates :url, presence: true, uniqueness: true, format: { with: URL_FORMAT, message: "must be a valid WebSocket URL (ws:// or wss://)" }
   validates :direction, inclusion: { in: UpstreamRelays::Directions::ALL }
