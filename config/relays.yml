@@ -14,6 +14,26 @@ default: &default
       backfill: true
       negentropy: false  # Relay returns "negentropy disabled" - doesn't support NIP-77
       direction: down
+    - url: wss://premium.primal.net
+      enabled: true
+      backfill: true
+      negentropy: true  # strfry v1.0.3, confirmed NIP-77 support
+      direction: down
+    - url: wss://purplerelay.com
+      enabled: true
+      backfill: true
+      negentropy: true  # strfry v407-7701d55
+      direction: down
+    - url: wss://relay.noderunners.network
+      enabled: true
+      backfill: true
+      negentropy: true  # strfry 1.0.3
+      direction: down
+    - url: wss://relay.mostr.pub
+      enabled: true
+      backfill: true
+      negentropy: true  # strfry 1.0.4
+      direction: down
     - url: wss://offchain.pub
       enabled: true
       backfill: true
@@ -61,7 +81,8 @@ default: &default
       - 7      # reaction
       - 30023  # long-form content
     negentropy_frame_size: 60000
-    negentropy_chunk_hours: 168       # Sync 1 week at a time for Negentropy
+    negentropy_chunk_hours: 2         # Sync 2 hours at a time for Negentropy (24h was timing out)
+    polling_chunk_hours: 6            # Sync 6 hours at a time for polling backfill (smaller = better coverage)
     upload_batch_size: 50
     upload_delay_ms: 100
     # Robustness settings for resumable backfill
