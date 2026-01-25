@@ -22,7 +22,7 @@ module Events
       target_event = events(:text_note)
       deletion_event = create_deletion_event(
         pubkey: target_event.pubkey,
-        tags: [["e", target_event.event_id]]
+        tags: [ [ "e", target_event.event_id ] ]
       )
 
       ProcessDeletionJob.new.perform(deletion_event.id)
@@ -36,7 +36,7 @@ module Events
       target_event = events(:other_author_note)
       deletion_event = create_deletion_event(
         pubkey: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", # Different from target
-        tags: [["e", target_event.event_id]]
+        tags: [ [ "e", target_event.event_id ] ]
       )
 
       ProcessDeletionJob.new.perform(deletion_event.id)
@@ -55,7 +55,7 @@ module Events
       # Try to delete the deletion
       second_deletion = create_deletion_event(
         pubkey: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-        tags: [["e", first_deletion.event_id]]
+        tags: [ [ "e", first_deletion.event_id ] ]
       )
 
       ProcessDeletionJob.new.perform(second_deletion.id)
@@ -73,7 +73,7 @@ module Events
 
       deletion_event = create_deletion_event(
         pubkey:,
-        tags: [["e", event1.event_id], ["e", event2.event_id]]
+        tags: [ [ "e", event1.event_id ], [ "e", event2.event_id ] ]
       )
 
       ProcessDeletionJob.new.perform(deletion_event.id)
@@ -93,7 +93,7 @@ module Events
 
       deletion_event = create_deletion_event(
         pubkey: target_event.pubkey,
-        tags: [["a", coordinate]]
+        tags: [ [ "a", coordinate ] ]
       )
 
       ProcessDeletionJob.new.perform(deletion_event.id)
@@ -125,7 +125,7 @@ module Events
       deletion_event = create_deletion_event(
         pubkey:,
         created_at: 1.hour.ago.to_i,
-        tags: [["a", "30023:#{pubkey}:test-article"]]
+        tags: [ [ "a", "30023:#{pubkey}:test-article" ] ]
       )
 
       ProcessDeletionJob.new.perform(deletion_event.id)
@@ -148,7 +148,7 @@ module Events
       # Attacker tries to delete someone else's event
       deletion_event = create_deletion_event(
         pubkey: attacker_pubkey,
-        tags: [["a", "30023:#{target_pubkey}:my-article"]]
+        tags: [ [ "a", "30023:#{target_pubkey}:my-article" ] ]
       )
 
       ProcessDeletionJob.new.perform(deletion_event.id)
@@ -177,7 +177,7 @@ module Events
 
     test "handles malformed a-tag coordinate" do
       deletion_event = create_deletion_event(
-        tags: [["a", "invalid-coordinate"]]
+        tags: [ [ "a", "invalid-coordinate" ] ]
       )
 
       assert_nothing_raised do
@@ -206,7 +206,7 @@ module Events
         pubkey:,
         nostr_created_at:,
         kind:,
-        tags: d_tag ? [["d", d_tag]] : [],
+        tags: d_tag ? [ [ "d", d_tag ] ] : [],
         content:,
         sig: SecureRandom.hex(64),
         raw_event: "{}",

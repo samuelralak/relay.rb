@@ -13,13 +13,13 @@ module Events
 
       def valid_deletion_event(overrides = {})
         {
-          "id" => overrides[:id] || SecureRandom.hex(32),
-          "pubkey" => overrides[:pubkey] || "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-          "created_at" => overrides[:created_at] || Time.current.to_i,
-          "kind" => 5,
-          "tags" => overrides[:tags] || [],
-          "content" => overrides[:content] || "deleted",
-          "sig" => SecureRandom.hex(64)
+          id: overrides[:id] || SecureRandom.hex(32),
+          pubkey: overrides[:pubkey] || "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          created_at: overrides[:created_at] || Time.current.to_i,
+          kind: 5,
+          tags: overrides[:tags] || [],
+          content: overrides[:content] || "deleted",
+          sig: SecureRandom.hex(64)
         }
       end
 
@@ -43,7 +43,7 @@ module Events
 
       test "enqueues ProcessDeletionJob" do
         event_data = valid_deletion_event(
-          tags: [["e", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"]]
+          tags: [ [ "e", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" ] ]
         )
 
         assert_enqueued_with(job: ProcessDeletionJob, queue: "deletions") do
@@ -61,7 +61,7 @@ module Events
 
         assert_enqueued_jobs 1, only: ProcessDeletionJob
         enqueued_job = enqueued_jobs.find { |job| job["job_class"] == "Events::ProcessDeletionJob" }
-        assert_equal [stored_event.id], enqueued_job["arguments"]
+        assert_equal [ stored_event.id ], enqueued_job["arguments"]
       end
 
       # =========================================================================

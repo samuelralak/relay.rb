@@ -11,13 +11,13 @@ module NostrRelay
 
       def valid_event(overrides = {})
         {
-          "id" => overrides[:id] || SecureRandom.hex(32),
-          "pubkey" => overrides[:pubkey] || SecureRandom.hex(32),
-          "created_at" => overrides[:created_at] || Time.current.to_i,
-          "kind" => overrides[:kind] || 1,
-          "tags" => overrides[:tags] || [],
-          "content" => overrides[:content] || "Hello, Nostr!",
-          "sig" => overrides[:sig] || SecureRandom.hex(64)
+          id: overrides[:id] || SecureRandom.hex(32),
+          pubkey: overrides[:pubkey] || SecureRandom.hex(32),
+          created_at: overrides[:created_at] || Time.current.to_i,
+          kind: overrides[:kind] || 1,
+          tags: overrides[:tags] || [],
+          content: overrides[:content] || "Hello, Nostr!",
+          sig: overrides[:sig] || SecureRandom.hex(64)
         }
       end
 
@@ -27,7 +27,7 @@ module NostrRelay
 
       test "rejects events with past expiration timestamp" do
         past_expiration = (Time.now.to_i - 3600).to_s  # 1 hour ago
-        event_data = valid_event(tags: [["expiration", past_expiration]])
+        event_data = valid_event(tags: [ [ "expiration", past_expiration ] ])
 
         result = EventContract.new.call(event_data)
 
@@ -37,7 +37,7 @@ module NostrRelay
 
       test "accepts events with future expiration timestamp" do
         future_expiration = (Time.now.to_i + 3600).to_s  # 1 hour from now
-        event_data = valid_event(tags: [["expiration", future_expiration]])
+        event_data = valid_event(tags: [ [ "expiration", future_expiration ] ])
 
         result = EventContract.new.call(event_data)
 
@@ -46,7 +46,7 @@ module NostrRelay
       end
 
       test "accepts events without expiration tag" do
-        event_data = valid_event(tags: [["p", SecureRandom.hex(32)]])
+        event_data = valid_event(tags: [ [ "p", SecureRandom.hex(32) ] ])
 
         result = EventContract.new.call(event_data)
 
@@ -55,7 +55,7 @@ module NostrRelay
       end
 
       test "ignores invalid expiration timestamp (zero)" do
-        event_data = valid_event(tags: [["expiration", "0"]])
+        event_data = valid_event(tags: [ [ "expiration", "0" ] ])
 
         result = EventContract.new.call(event_data)
 
@@ -64,7 +64,7 @@ module NostrRelay
       end
 
       test "ignores invalid expiration timestamp (non-numeric)" do
-        event_data = valid_event(tags: [["expiration", "invalid"]])
+        event_data = valid_event(tags: [ [ "expiration", "invalid" ] ])
 
         result = EventContract.new.call(event_data)
 

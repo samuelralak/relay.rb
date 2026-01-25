@@ -22,7 +22,7 @@ module Events
           # New event stored, enqueue processing
           ProcessDeletionJob.perform_later(event.id)
           Success(event)
-        in Failure[:invalid, message] if message.include?("has already been taken")
+        in Failure[ :invalid, message ] if message.include?("has already been taken")
           # Duplicate caught by model validation
           Success(duplicate: true, event_id: event_data["id"])
         in Failure => failure

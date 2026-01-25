@@ -282,14 +282,14 @@ class EventTest < ActiveSupport::TestCase
 
   test "matches_filter? returns false for expired events" do
     expired = events(:expired_event)
-    filter = { kinds: [1] }
+    filter = { kinds: [ 1 ] }
 
     assert_not expired.matches_filter?(filter)
   end
 
   test "matches_filter? returns true for non-expired events" do
     event = events(:text_note)
-    filter = { kinds: [1] }
+    filter = { kinds: [ 1 ] }
 
     assert event.matches_filter?(filter)
   end

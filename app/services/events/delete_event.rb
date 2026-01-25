@@ -16,11 +16,11 @@ module Events
 
       # Process "e" tags (event IDs to delete)
       e_tags = tags.select { |t| t.is_a?(Array) && t[0] == "e" && t[1].present? }
-      e_tags.each { |tag| delete_by_event_id(tag[1], pubkey) }
+      e_tags.each do |tag| delete_by_event_id(tag[1], pubkey) end
 
       # Process "a" tags (addressable coordinates: "kind:pubkey:d-tag")
       a_tags = tags.select { |t| t.is_a?(Array) && t[0] == "a" && t[1].present? }
-      a_tags.each { |tag| delete_by_coordinate(tag[1], pubkey, deletion_timestamp) }
+      a_tags.each do |tag| delete_by_coordinate(tag[1], pubkey, deletion_timestamp) end
 
       Success(deletion_event)
     end
