@@ -20,7 +20,7 @@ module Sync
       private
 
       def backfill_mode?
-        [RelaySync::SyncMode::BACKFILL, RelaySync::SyncMode::FULL].include?(mode)
+        [ RelaySync::SyncMode::BACKFILL, RelaySync::SyncMode::FULL ].include?(mode)
       end
 
       def dispatch_job

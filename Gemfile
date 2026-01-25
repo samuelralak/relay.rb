@@ -35,7 +35,7 @@ gem "thruster", require: false
 gem "image_processing", "~> 1.2"
 
 # Use Rack CORS for handling Cross-Origin Resource Sharing (CORS), making cross-origin Ajax possible
-# gem "rack-cors"
+gem "rack-cors"
 
 group :development, :test do
   # See https://guides.rubyonrails.org/debugging_rails_applications.html#debugging-with-the-debug-gem
@@ -65,3 +65,10 @@ gem "dry-initializer", "~> 3.1"
 gem "dry-struct", "~> 1.6"
 gem "dry-initializer-rails", "~> 3.1"
 gem "dry-monads", "~> 1.6"
+gem "dry-validation", "~> 1.10"
+
+# NIP-01: Nostr protocol and Schnorr signature verification (BIP-340)
+gem "nostr", "~> 0.7"
+
+# Thread-safe data structures for WebSocket connections
+gem "concurrent-ruby", "~> 1.2"

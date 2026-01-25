@@ -13,10 +13,11 @@ module RelayRb
     # Initialize configuration defaults for originally generated Rails version.
     config.load_defaults 8.1
 
-    # Please, add to the `ignore` list any other `lib` subdirectories that do
-    # not contain `.rb` files, or that should not be reloaded or eager loaded.
-    # Common ones are `templates`, `generators`, or `middleware`, for example.
-    config.autoload_lib(ignore: %w[assets tasks negentropy relay_sync])
+    # Autoload lib/ subdirectories, excluding non-Ruby directories
+    config.autoload_lib(ignore: %w[assets tasks negentropy relay_sync nostr_relay])
+
+    # Add app/middleware to autoload paths (not included by default)
+    # config.autoload_paths << Rails.root.join("app/middleware")
 
     # Configuration for the application, engines, and railties goes here.
     #

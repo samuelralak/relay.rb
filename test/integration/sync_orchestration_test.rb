@@ -186,11 +186,11 @@ class SyncOrchestrationTest < ActiveSupport::TestCase
 
     # Simulate state after completion
     filter_hash = SyncState.compute_filter_hash(direction: "down", filter: {})
-    state = SyncState.find_or_create_by!(relay_url: relay.url, filter_hash:) do |s|
+    state = SyncState.find_or_create_by!(relay_url: relay.url, filter_hash:) { |s|
       s.direction = "down"
       s.events_downloaded = 0
       s.events_uploaded = 0
-    end
+    }
     state.update!(
       status: "completed",
       backfill_target: 1.month.ago,
