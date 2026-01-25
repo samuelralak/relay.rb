@@ -30,19 +30,15 @@ bundle install
 bin/rails db:migrate
 ```
 
-### 3. Configure Relays
+### 3. Seed Relays
 
-Edit `config/relays.yml` to add your upstream relays:
+Run the database seeds to populate upstream relays:
 
-```yaml
-development:
-  upstream_relays:
-    - url: wss://relay.damus.io
-      enabled: true
-      backfill: true
-      negentropy: true
-      direction: down    # down, up, or both
+```bash
+bin/rails db:seed
 ```
+
+Or manage relays via the API (see [API Configuration](#api-configuration) below).
 
 ### 4. Start the Application
 
@@ -63,51 +59,83 @@ bin/rails sync:status
 
 ## Configuration
 
-### Relay Configuration (`config/relays.yml`)
+### Relay Configuration (Database)
 
-```yaml
-default: &default
-  upstream_relays:
-    - url: wss://relay.damus.io
-      enabled: true       # Enable/disable this relay
-      backfill: true      # Include in backfill operations
-      negentropy: true    # Use Negentropy protocol if supported
-      direction: down     # Sync direction: down, up, or both
+Relays are stored in the `upstream_relays` table and managed via API or seeds.
 
-    - url: wss://nos.lol
-      enabled: true
-      backfill: true
-      negentropy: true
-      direction: down
+**UpstreamRelay fields:**
 
-    - url: wss://my-backup.relay.com
-      enabled: true
-      backfill: false
-      negentropy: false
-      direction: up       # Upload only (backup relay)
+| Field | Type | Description |
+|-------|------|-------------|
+| `url` | string | WebSocket URL (wss://...) |
+| `enabled` | boolean | Enable/disable this relay |
+| `backfill` | boolean | Include in backfill operations |
+| `negentropy` | boolean | Use Negentropy protocol (NIP-77) |
+| `direction` | string | `down`, `up`, or `both` |
+| `notes` | text | Optional notes about the relay |
+| `config` | jsonb | Per-relay config overrides |
 
-  sync:
-    batch_size: 100                    # Events per batch
-    max_concurrent_connections: 10     # Max simultaneous connections
-    reconnect_delay_seconds: 5         # Wait before reconnecting
-    max_reconnect_attempts: 10         # Max reconnection tries
-    backfill_since_hours: 43800        # Default backfill window (5 years)
-    event_kinds: []                    # Empty = all kinds
-    negentropy_frame_size: 60000       # Max message size (60KB)
-    negentropy_chunk_hours: 168        # Chunk size for progressive backfill
-    upload_batch_size: 50              # Events per upload batch
-    upload_delay_ms: 100               # Delay between uploads
-    polling_window_minutes: 15         # Realtime polling window
-    polling_timeout_seconds: 30        # Timeout per poll operation
-    stale_threshold_minutes: 10        # When to consider a sync stale
-    error_retry_after_minutes: 30      # How long before retrying errors
+**Example seed data (`db/seeds.rb`):**
 
-development:
-  <<: *default
-
-production:
-  <<: *default
+```ruby
+UpstreamRelay.find_or_create_by!(url: "wss://relay.damus.io") do |r|
+  r.enabled = true
+  r.backfill = true
+  r.negentropy = false
+  r.direction = UpstreamRelays::Directions::DOWN
+end
 ```
+
+### API Configuration
+
+Manage relays via REST API with bearer token authentication:
+
+```bash
+# Create API key
+bin/rails relay_config:create_api_key[MyKey]
+
+# List relays
+curl -H "Authorization: Bearer rlk_..." http://localhost:3000/api/v1/relays
+
+# Create relay
+curl -X POST -H "Authorization: Bearer rlk_..." \
+  -H "Content-Type: application/json" \
+  -d '{"upstream_relay":{"url":"wss://new.relay.com","direction":"down"}}' \
+  http://localhost:3000/api/v1/relays
+
+# Update relay
+curl -X PATCH -H "Authorization: Bearer rlk_..." \
+  -H "Content-Type: application/json" \
+  -d '{"upstream_relay":{"enabled":false}}' \
+  http://localhost:3000/api/v1/relays/:id
+
+# Delete relay
+curl -X DELETE -H "Authorization: Bearer rlk_..." \
+  http://localhost:3000/api/v1/relays/:id
+```
+
+### Sync Settings (Defaults)
+
+Sync settings are defined with sensible defaults in `UpstreamRelays::Config`:
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `batch_size` | 100 | Events per batch |
+| `max_concurrent_connections` | 10 | Max simultaneous connections |
+| `reconnect_delay_seconds` | 5 | Wait before reconnecting |
+| `max_reconnect_attempts` | 10 | Max reconnection tries |
+| `backfill_since_hours` | 43800 | Default backfill window (5 years) |
+| `negentropy_frame_size` | 60000 | Max message size (60KB) |
+| `negentropy_chunk_hours` | 2 | Chunk size for negentropy sync |
+| `polling_chunk_hours` | 6 | Chunk size for polling backfill |
+| `upload_batch_size` | 50 | Events per upload batch |
+| `upload_delay_ms` | 100 | Delay between uploads |
+| `polling_window_minutes` | 15 | Realtime polling window |
+| `polling_timeout_seconds` | 30 | Timeout per poll operation |
+| `stale_threshold_minutes` | 10 | When to consider sync stale |
+| `error_retry_after_minutes` | 30 | How long before retrying errors |
+
+Per-relay overrides can be set in the `config` JSON field.
 
 ### Sync Directions
 
@@ -507,13 +535,16 @@ curl -I https://relay.example.com
 
 **Problem**: Connected but no events arriving
 
-1. Check your filter configuration in `config/relays.yml`
-2. Verify `event_kinds` includes the kinds you want (or is empty for all)
-3. Check `backfill_since_hours` covers the time range you need
+1. Check relay configuration in database (`UpstreamRelay.all`)
+2. Verify relay is enabled and has correct direction
+3. Check `backfill_since_hours` in config covers the time range you need
 
 ```bash
 # Check current event count
 bin/rails runner "puts Event.count"
+
+# Check relay configuration
+bin/rails runner "UpstreamRelay.enabled.each { |r| puts \"#{r.url}: #{r.direction}\" }"
 ```
 
 ### Reset and Start Fresh

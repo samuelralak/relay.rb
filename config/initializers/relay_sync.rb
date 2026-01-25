@@ -6,8 +6,10 @@ require "negentropy"
 # Configure RelaySync library for syncing events with upstream Nostr relays
 require "relay_sync"
 
-RelaySync.configure do |config|
-  config.load_from_yaml(Rails.root.join("config/relays.yml"), Rails.env)
+Rails.application.config.after_initialize do
+  RelaySync.configure do |config|
+    config.relay_provider = UpstreamRelay
+  end
 end
 
 # Configure logging to use Rails logger

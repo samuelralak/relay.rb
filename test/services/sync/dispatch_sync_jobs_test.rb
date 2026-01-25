@@ -22,19 +22,19 @@ module Sync
         url: "wss://negentropy.relay.com",
         negentropy: true,
         backfill: true,
-        direction: "down"
+        direction: UpstreamRelays::Directions::DOWN
       )
       @polling_relay = create_fake_relay(
         url: "wss://polling.relay.com",
         negentropy: false,
         backfill: true,
-        direction: "down"
+        direction: UpstreamRelays::Directions::DOWN
       )
       @upload_relay = create_fake_relay(
         url: "wss://upload.relay.com",
         negentropy: false,
         backfill: false,
-        direction: "up"
+        direction: UpstreamRelays::Directions::UP
       )
     end
 
@@ -43,14 +43,14 @@ module Sync
       RelaySync.instance_variable_set(:@configuration, @original_config)
     end
 
-    def create_fake_relay(url:, negentropy: false, backfill: false, direction: "down")
+    def create_fake_relay(url:, negentropy: false, backfill: false, direction: UpstreamRelays::Directions::DOWN)
       relay = Object.new
       relay.define_singleton_method(:url) do url end
       relay.define_singleton_method(:negentropy?) do negentropy end
       relay.define_singleton_method(:backfill?) do backfill end
       relay.define_singleton_method(:direction) do direction end
       relay.define_singleton_method(:enabled?) do true end
-      relay.define_singleton_method(:upload_enabled?) do direction == "up" || direction == "both" end
+      relay.define_singleton_method(:upload_enabled?) do UpstreamRelays::Directions::UPLOAD_CAPABLE.include?(direction) end
       relay
     end
 
@@ -60,7 +60,7 @@ module Sync
       fake_config.define_singleton_method(:download_relays) do download end
       fake_config.define_singleton_method(:upload_relays) do upload end
       fake_config.define_singleton_method(:find_relay) do |url| (backfill + download + upload).find { |r| r.url == url } end
-      fake_config.define_singleton_method(:sync_settings) do @original_config&.sync_settings || RelaySync::Configuration.new.sync_settings end
+      fake_config.define_singleton_method(:sync_settings) do UpstreamRelays::Config.new({}) end
 
       RelaySync.instance_variable_set(:@configuration, fake_config)
       yield

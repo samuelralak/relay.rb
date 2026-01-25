@@ -16,7 +16,7 @@ module Sync
       empty_config.define_singleton_method(:download_relays) do [] end
       empty_config.define_singleton_method(:upload_relays) do [] end
       empty_config.define_singleton_method(:find_relay) do |_url| nil end
-      empty_config.define_singleton_method(:sync_settings) do @original_config&.sync_settings || RelaySync::Configuration.new.sync_settings end
+      empty_config.define_singleton_method(:sync_settings) do UpstreamRelays::Config.new({}) end
 
       RelaySync.instance_variable_set(:@configuration, empty_config)
     end
