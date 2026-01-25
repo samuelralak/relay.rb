@@ -37,23 +37,23 @@ module NostrRelay
 
     # Outbound message methods per NIP-01
     def send_event(sub_id, event)
-      send_message([Messages::Outbound::EVENT, sub_id, event])
+      send_message([ Messages::Outbound::EVENT, sub_id, event ])
     end
 
     def send_ok(event_id, success, message = "")
-      send_message([Messages::Outbound::OK, event_id, success, message])
+      send_message([ Messages::Outbound::OK, event_id, success, message ])
     end
 
     def send_eose(sub_id)
-      send_message([Messages::Outbound::EOSE, sub_id])
+      send_message([ Messages::Outbound::EOSE, sub_id ])
     end
 
     def send_closed(sub_id, message)
-      send_message([Messages::Outbound::CLOSED, sub_id, message])
+      send_message([ Messages::Outbound::CLOSED, sub_id, message ])
     end
 
     def send_notice(message)
-      send_message([Messages::Outbound::NOTICE, message])
+      send_message([ Messages::Outbound::NOTICE, message ])
     end
 
     private

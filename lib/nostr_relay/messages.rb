@@ -10,7 +10,7 @@ module NostrRelay
       REQ   = "REQ"
       CLOSE = "CLOSE"
 
-      ALL = [EVENT, REQ, CLOSE].freeze
+      ALL = [ EVENT, REQ, CLOSE ].freeze
     end
 
     # Relay → Client message types
@@ -21,7 +21,7 @@ module NostrRelay
       CLOSED = "CLOSED"
       NOTICE = "NOTICE"
 
-      ALL = [EVENT, OK, EOSE, CLOSED, NOTICE].freeze
+      ALL = [ EVENT, OK, EOSE, CLOSED, NOTICE ].freeze
     end
 
     # OK/CLOSED message prefixes (NIP-01)

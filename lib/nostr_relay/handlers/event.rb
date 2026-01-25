@@ -19,11 +19,11 @@ module NostrRelay
           connection.send_ok(id, true, Messages::Prefix::DUPLICATE)
         in Success(event_id: id)
           connection.send_ok(id, true, "")
-        in Failure[:invalid, message]
+        in Failure[ :invalid, message ]
           connection.send_ok(event_id, false, message)
-        in Failure[:blocked, message]
+        in Failure[ :blocked, message ]
           connection.send_ok(event_id, false, message)
-        in Failure[_, message]
+        in Failure[ _, message ]
           connection.send_ok(event_id, false, "#{Messages::Prefix::ERROR} #{message}")
         end
       rescue StandardError => e

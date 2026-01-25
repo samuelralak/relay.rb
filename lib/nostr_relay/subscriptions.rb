@@ -35,7 +35,7 @@ module NostrRelay
         # Enforce max subscriptions limit from NIP-11
         max_subs = Config.max_subscriptions
         if is_new && conn_subs.size >= max_subs
-          return [false, "#{Messages::Prefix::ERROR} too many subscriptions (max #{max_subs})"]
+          return [ false, "#{Messages::Prefix::ERROR} too many subscriptions (max #{max_subs})" ]
         end
 
         # Cancel existing subscription with same ID (if any)
@@ -47,7 +47,7 @@ module NostrRelay
           filters:
         )
 
-        [true, nil]
+        [ true, nil ]
       end
 
       def unsubscribe(connection_id, sub_id)
