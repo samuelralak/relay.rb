@@ -76,6 +76,9 @@ GEM
       tzinfo (~> 2.0, >= 2.0.5)
       uri (>= 0.13.1)
     ast (2.4.3)
+    barnes (0.0.9)
+      multi_json (~> 1)
+      statsd-ruby (~> 1.1)
     base64 (0.3.0)
     bcrypt_pbkdf (1.1.2)
     bech32 (1.5.0)
@@ -395,6 +398,7 @@ GEM
       net-sftp (>= 2.1.2)
       net-ssh (>= 2.8.0)
       ostruct
+    statsd-ruby (1.5.0)
     stringio (3.2.0)
     thor (1.5.0)
     thruster (0.1.17)
@@ -428,6 +432,7 @@ PLATFORMS
   x86_64-linux-musl
 
 DEPENDENCIES
+  barnes (~> 0.0.9)
   bootsnap
   brakeman
   bundler-audit
@@ -472,6 +477,7 @@ CHECKSUMS
   activestorage (8.1.2) sha256=8a63a48c3999caeee26a59441f813f94681fc35cc41aba7ce1f836add04fba76
   activesupport (8.1.2) sha256=88842578ccd0d40f658289b0e8c842acfe9af751afee2e0744a7873f50b6fdae
   ast (2.4.3) sha256=954615157c1d6a382bc27d690d973195e79db7f55e9765ac7c481c60bdb4d383
+  barnes (0.0.9) sha256=c2148c3f50a5f2eec0b0d85b00e4cc990fe802b39edb6de0a825dde9cc42649b
   base64 (0.3.0) sha256=27337aeabad6ffae05c265c450490628ef3ebd4b67be58257393227588f5a97b
   bcrypt_pbkdf (1.1.2) sha256=c2414c23ce66869b3eb9f643d6a3374d8322dfb5078125c82792304c10b94cf6
   bech32 (1.5.0) sha256=04520e3bd899a8d9d27e698eb4fc0e9f9292b42d13628d9a1814b3b8a9a68a8a
@@ -599,6 +605,7 @@ CHECKSUMS
   solid_cache (1.0.10) sha256=bc05a2fb3ac78a6f43cbb5946679cf9db67dd30d22939ededc385cb93e120d41
   solid_queue (1.3.1) sha256=d9580111180c339804ff1a810a7768f69f5dc694d31e86cf1535ff2cd7a87428
   sshkit (1.25.0) sha256=c8c6543cdb60f91f1d277306d585dd11b6a064cb44eab0972827e4311ff96744
+  statsd-ruby (1.5.0) sha256=369ddf09537408e273849e09b84d4edbdac24ac461f5c9b6cacb0e4398190109
   stringio (3.2.0) sha256=c37cb2e58b4ffbd33fe5cd948c05934af997b36e0b6ca6fdf43afa234cf222e1
   thor (1.5.0) sha256=e3a9e55fe857e44859ce104a84675ab6e8cd59c650a49106a05f55f136425e73
   thruster (0.1.17) sha256=6f3f1de43e22f0162d81cbc363f45ee42a1b8460213856c1a899cbf0d3297235

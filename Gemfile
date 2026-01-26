@@ -75,3 +75,5 @@ gem "concurrent-ruby", "~> 1.2"
 
 # NIP-50: OpenSearch for full-text search
 gem "opensearch-ruby", "~> 3.0"
+
+gem "barnes", "~> 0.0.9"
