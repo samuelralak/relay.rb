@@ -8,8 +8,8 @@ Rails.application.config.relay_info = {
   pubkey: ENV["RELAY_PUBKEY"],
   contact: ENV["RELAY_CONTACT"],
   supported_nips: [ 1, 9, 11, 40, 50 ],
-  software: "https://github.com/samuelralak/relay_rb",
-  version: "0.1.0",
+  software: ENV.fetch("RELAY_SOFTWARE", "https://github.com/samuelralak/relay.rb"),
+  version: ENV.fetch("RELAY_VERSION", "0.1.0"),
   limitation: {
     max_message_length: 16_384,
     max_subscriptions: 20,
