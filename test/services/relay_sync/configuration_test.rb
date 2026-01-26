@@ -175,7 +175,7 @@ module RelaySync
       assert_equal 5, config.reconnect_delay_seconds
       assert_equal 10, config.max_reconnect_attempts
       assert_equal 43_800, config.backfill_since_hours
-      assert_equal [ 0, 1, 3, 5, 6, 7, 30_023 ], config.event_kinds
+      assert_equal UpstreamRelays::Config::DEFAULT_EVENT_KINDS, config.event_kinds
       assert_equal 60_000, config.negentropy_frame_size
       assert_equal 50, config.upload_batch_size
       assert_equal 100, config.upload_delay_ms
