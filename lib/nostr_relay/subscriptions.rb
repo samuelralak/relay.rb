@@ -129,7 +129,7 @@ module NostrRelay
           next unless connection
 
           begin
-            connection.close(1001, "Server shutting down")
+            connection.close(1000, "Server shutting down")
             closed += 1
           rescue StandardError => e
             Config.logger.error("[NostrRelay] Error closing connection #{conn_id}: #{e.message}")

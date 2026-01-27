@@ -59,7 +59,7 @@ preload_app! if ENV["RAILS_ENV"] == "production"
 
 # Re-establish database connections in workers after fork
 # Required when using preload_app! since master's connections don't work in workers
-on_worker_boot do
+before_worker_boot do
   ActiveRecord::Base.establish_connection if defined?(ActiveRecord::Base)
 end
 
@@ -67,7 +67,7 @@ end
 # Ensures clean dyno restarts on Heroku (prevents R12 exit timeout)
 
 # Called when a worker process is shutting down (clustered mode)
-on_worker_shutdown do
+before_worker_shutdown do
   if defined?(NostrRelay::Subscriptions)
     NostrRelay::Subscriptions.shutdown
   end
