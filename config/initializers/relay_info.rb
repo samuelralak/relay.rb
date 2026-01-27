@@ -22,7 +22,8 @@ Rails.application.config.relay_info = {
     auth_required: false,
     payment_required: false,
     search_query_max_length: 256,  # NIP-50
-    search_max_limit: 500          # NIP-50
+    search_max_limit: 500,         # NIP-50
+    ping_interval: 20              # WebSocket keepalive (Heroku idle timeout is 55s)
   }
 }
 

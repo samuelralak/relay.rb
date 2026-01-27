@@ -26,6 +26,10 @@ module NostrRelay
             connection.on_close(event.code, event.reason)
           end
 
+          ws.on :error do |event|
+            connection.on_error(event)
+          end
+
           ws.rack_response
         else
           @app.call(env)

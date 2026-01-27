@@ -50,3 +50,42 @@ if ENV["RAILS_ENV"] == "production"
     Barnes.start
   end
 end
+
+# Enable workers in production for better concurrency
+workers ENV.fetch("WEB_CONCURRENCY", 2) if ENV["RAILS_ENV"] == "production"
+
+# Preload app for faster worker boot (copy-on-write memory savings)
+preload_app! if ENV["RAILS_ENV"] == "production"
+
+# Re-establish database connections in workers after fork
+# Required when using preload_app! since master's connections don't work in workers
+on_worker_boot do
+  ActiveRecord::Base.establish_connection if defined?(ActiveRecord::Base)
+end
+
+# Graceful shutdown for WebSocket connections
+# Ensures clean dyno restarts on Heroku (prevents R12 exit timeout)
+
+# Called when a worker process is shutting down (clustered mode)
+on_worker_shutdown do
+  if defined?(NostrRelay::Subscriptions)
+    NostrRelay::Subscriptions.shutdown
+  end
+end
+
+# Fallback: at_exit runs when process terminates (covers SIGTERM in single mode)
+at_exit do
+  if defined?(NostrRelay::Subscriptions) && NostrRelay::Subscriptions.connection_count > 0
+    NostrRelay::Subscriptions.shutdown
+  end
+end
+
+# Also handle lowlevel_error_handler for unexpected errors
+lowlevel_error_handler do |error, env, status_code|
+  if defined?(Rails)
+    Rails.logger.error("[Puma] Low-level error: #{error.class}: #{error.message}")
+    Rails.logger.error(error.backtrace&.first(10)&.join("\n"))
+  end
+  # Return a basic error response
+  [status_code, {}, ["Internal Server Error"]]
+end

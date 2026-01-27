@@ -12,6 +12,7 @@ module NostrRelay
     def initialize(websocket)
       @ws = websocket
       @id = SecureRandom.uuid
+      @send_mutex = Mutex.new
     end
 
     def on_open
@@ -30,9 +31,25 @@ module NostrRelay
       Router.route(connection: self, data:)
     end
 
-    def on_close(_code, _reason)
+    def on_close(code, reason)
       Subscriptions.unregister(@id)
-      Config.logger.info("[NostrRelay] Connection closed: #{@id}")
+      Config.logger.info("[NostrRelay] Connection closed: #{@id} (code=#{code}, reason=#{reason})")
+    end
+
+    def on_error(event)
+      message = event.respond_to?(:message) ? event.message : event.to_s
+      Config.logger.error("[NostrRelay] WebSocket error on #{@id}: #{message}")
+      # Connection will be cleaned up by on_close which follows on_error
+    end
+
+    # Close the WebSocket connection gracefully
+    # Uses mutex to prevent race with concurrent send operations
+    def close(code = 1000, reason = "")
+      @send_mutex.synchronize do
+        @ws.close(code, reason)
+      end
+    rescue StandardError => e
+      Config.logger.error("[NostrRelay] Error closing connection #{@id}: #{e.message}")
     end
 
     # Outbound message methods per NIP-01
@@ -58,10 +75,13 @@ module NostrRelay
 
     private
 
+    # Thread-safe message sending to prevent corruption from concurrent writes
     def send_message(payload)
-      @ws.send(payload.to_json)
+      @send_mutex.synchronize do
+        @ws.send(payload.to_json)
+      end
     rescue StandardError => e
-      Config.logger.error("[NostrRelay] Failed to send message: #{e.message}")
+      Config.logger.error("[NostrRelay] Failed to send message to #{@id}: #{e.message}")
     end
   end
 end

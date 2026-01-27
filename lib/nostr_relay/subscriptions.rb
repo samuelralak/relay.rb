@@ -102,6 +102,50 @@ module NostrRelay
         @subscriptions = Concurrent::Hash.new { |h, k| h[k] = Concurrent::Hash.new }
       end
 
+      # Graceful shutdown: close all connections
+      # Called on SIGTERM to allow clean dyno restarts
+      # Must complete within Heroku's 30s window, so we use a timeout
+      def shutdown(timeout: 25)
+        count = connections.size
+        return if count.zero?
+
+        Config.logger.info("[NostrRelay] Shutting down #{count} connections...")
+        start_time = Time.now
+        closed = 0
+
+        # Take a snapshot of connection IDs to avoid iteration issues
+        connection_ids = connections.keys
+
+        connection_ids.each_with_index do |conn_id, index|
+          # Check timeout (O(1) instead of O(n) with index lookup)
+          elapsed = Time.now - start_time
+          if elapsed > timeout
+            remaining = connection_ids.size - index
+            Config.logger.warn("[NostrRelay] Shutdown timeout after #{elapsed.round(1)}s, #{remaining} connections not closed gracefully")
+            break
+          end
+
+          connection = connections[conn_id]
+          next unless connection
+
+          begin
+            connection.close(1001, "Server shutting down")
+            closed += 1
+          rescue StandardError => e
+            Config.logger.error("[NostrRelay] Error closing connection #{conn_id}: #{e.message}")
+          end
+        end
+
+        reset!
+        elapsed = (Time.now - start_time).round(2)
+        Config.logger.info("[NostrRelay] Shutdown complete: #{closed}/#{count} connections closed in #{elapsed}s")
+      end
+
+      # Number of active connections (for monitoring)
+      def connection_count
+        connections.size
+      end
+
       private
 
       # Returns true on success, false if connection is dead
