@@ -71,12 +71,15 @@ if ENV["RAILS_ENV"] == "production" && ENV["REDIS_URL"]
 
   on_worker_boot do
     ActiveRecord::Base.establish_connection if defined?(ActiveRecord::Base)
-    NostrRelay::RedisPubsub.start_subscriber if defined?(NostrRelay::RedisPubsub)
 
-    # Log EventMachine status for debugging WebSocket issues
-    if defined?(EventMachine)
-      puts "[Puma Worker] EventMachine reactor running: #{EventMachine.reactor_running?}"
+    # Start EventMachine reactor in background thread for faye-websocket
+    if defined?(EventMachine) && !EventMachine.reactor_running?
+      Thread.new { EventMachine.run }
+      sleep 0.1 # Allow reactor to start
+      puts "[Puma Worker] EventMachine reactor started: #{EventMachine.reactor_running?}"
     end
+
+    NostrRelay::RedisPubsub.start_subscriber if defined?(NostrRelay::RedisPubsub)
   end
 
   on_worker_shutdown do
@@ -84,6 +87,7 @@ if ENV["RAILS_ENV"] == "production" && ENV["REDIS_URL"]
     if defined?(NostrRelay::Subscriptions) && NostrRelay::Subscriptions.connection_count > 0
       NostrRelay::Subscriptions.shutdown
     end
+    EventMachine.stop if defined?(EventMachine) && EventMachine.reactor_running?
   end
 end
 
@@ -93,6 +97,7 @@ at_exit do
   if defined?(NostrRelay::Subscriptions) && NostrRelay::Subscriptions.connection_count > 0
     NostrRelay::Subscriptions.shutdown
   end
+  EventMachine.stop if defined?(EventMachine) && EventMachine.reactor_running?
 end
 
 # Also handle lowlevel_error_handler for unexpected errors
