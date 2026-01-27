@@ -86,13 +86,11 @@ module NostrRelay
       def send_database_results(connection, sub_id, filters, limit)
         return if filters.empty?
 
-        # Query events via configured repository adapter
-        # Repository is responsible for column selection and query optimization
-        events = Config.event_repository
-                   .matching_filters(filters)
-                   .limit(limit)
+        # Use OpenSearch for fast queries on large datasets
+        # Falls back to PostgreSQL internally if unavailable or for tag filters
+        result = Search::QueryByFilters.call(filters: filters, limit: limit)
 
-        events.each do |event|
+        result.value![:events].each do |event|
           connection.send_event(sub_id, Config.event_serializer.serialize(event))
         end
       end
