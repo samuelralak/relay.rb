@@ -1,53 +1,44 @@
 # frozen_string_literal: true
 
+require "concurrent"
+
 # Rack middleware for Nostr WebSocket protocol (NIP-01)
 # Intercepts WebSocket connections and delegates to NostrRelay protocol handlers
 module NostrRelay
   module Websocket
     class Middleware
+      # Thread pool to prevent thread exhaustion (Heroku has low ulimit)
+      THREAD_POOL = Concurrent::FixedThreadPool.new(
+        ENV.fetch("WEBSOCKET_THREAD_POOL_SIZE", 10).to_i,
+        max_queue: ENV.fetch("WEBSOCKET_THREAD_POOL_QUEUE", 100).to_i,
+        fallback_policy: :discard
+      )
+
       def initialize(app)
         @app = app
       end
 
       def call(env)
-        # Debug: Log WebSocket detection
         is_websocket = Faye::WebSocket.websocket?(env)
-        Config.logger.debug("[NostrRelay::Middleware] Request: websocket=#{is_websocket}, upgrade=#{env['HTTP_UPGRADE']}, connection=#{env['HTTP_CONNECTION']}")
 
         if is_websocket
           ws = Faye::WebSocket.new(env, nil, websocket_options)
           connection = NostrRelay::Connection.new(ws)
 
           ws.on :open do |_event|
-            Thread.new do
-              Rails.application.executor.wrap do
-                connection.on_open
-              end
-            end
+            execute_async { connection.on_open }
           end
 
           ws.on :message do |event|
-            Thread.new do
-              Rails.application.executor.wrap do
-                connection.on_message(event.data)
-              end
-            end
+            execute_async { connection.on_message(event.data) }
           end
 
           ws.on :close do |event|
-            Thread.new do
-              Rails.application.executor.wrap do
-                connection.on_close(event.code, event.reason)
-              end
-            end
+            execute_async { connection.on_close(event.code, event.reason) }
           end
 
           ws.on :error do |event|
-            Thread.new do
-              Rails.application.executor.wrap do
-                connection.on_error(event)
-              end
-            end
+            execute_async { connection.on_error(event) }
           end
 
           ws.rack_response
@@ -57,6 +48,14 @@ module NostrRelay
       end
 
       private
+
+      def execute_async(&block)
+        THREAD_POOL.post do
+          Rails.application.executor.wrap(&block)
+        rescue StandardError => e
+          Config.logger.error("[NostrRelay] Thread pool error: #{e.class}: #{e.message}")
+        end
+      end
 
       def websocket_options
         options = {}
