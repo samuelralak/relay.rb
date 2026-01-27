@@ -51,34 +51,19 @@ if ENV["RAILS_ENV"] == "production"
   end
 end
 
-# Enable workers in production for better concurrency
-workers ENV.fetch("WEB_CONCURRENCY", 2) if ENV["RAILS_ENV"] == "production"
+# Single-process mode for WebSocket apps
+# ======================================
+# NostrRelay uses in-memory state for subscriptions and connections.
+# With multiple workers, each process has isolated state, so broadcasts
+# from Worker 1 never reach subscribers on Worker 2.
+#
+# Single-process mode ensures all WebSocket connections share the same
+# subscription registry, enabling proper real-time event broadcasts.
+#
+# To enable clustered mode in the future, you'd need cross-worker pub/sub
+# (PostgreSQL LISTEN/NOTIFY or Redis) to synchronize broadcasts.
 
-# Preload app for faster worker boot (copy-on-write memory savings)
-preload_app! if ENV["RAILS_ENV"] == "production"
-
-# Force workers to shutdown after 20s (Heroku gives 30s total)
-# This is critical for WebSocket apps - without it, workers wait forever
-# for long-lived connections to finish, and before_worker_shutdown never runs
-worker_shutdown_timeout 20 if ENV["RAILS_ENV"] == "production"
-
-# Re-establish database connections in workers after fork
-# Required when using preload_app! since master's connections don't work in workers
-before_worker_boot do
-  ActiveRecord::Base.establish_connection if defined?(ActiveRecord::Base)
-end
-
-# Graceful shutdown for WebSocket connections
-# Ensures clean dyno restarts on Heroku (prevents R12 exit timeout)
-
-# Called when a worker process is shutting down (clustered mode)
-before_worker_shutdown do
-  if defined?(NostrRelay::Subscriptions)
-    NostrRelay::Subscriptions.shutdown
-  end
-end
-
-# Fallback: at_exit runs when process terminates (covers SIGTERM in single mode)
+# Graceful shutdown for WebSocket connections in single-process mode
 at_exit do
   if defined?(NostrRelay::Subscriptions) && NostrRelay::Subscriptions.connection_count > 0
     NostrRelay::Subscriptions.shutdown
