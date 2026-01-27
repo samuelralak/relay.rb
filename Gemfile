@@ -73,6 +73,10 @@ gem "nostr", "~> 0.7"
 # Thread-safe data structures for WebSocket connections
 gem "concurrent-ruby", "~> 1.2"
 
+# Redis for cross-worker pub/sub (enables Puma clustered mode)
+gem "redis", "~> 5.0"
+gem "connection_pool", "~> 2.4"
+
 # NIP-50: OpenSearch for full-text search
 gem "opensearch-ruby", "~> 3.0"
 

@@ -51,20 +51,31 @@ if ENV["RAILS_ENV"] == "production"
   end
 end
 
-# Single-process mode for WebSocket apps
-# ======================================
-# NostrRelay uses in-memory state for subscriptions and connections.
-# With multiple workers, each process has isolated state, so broadcasts
-# from Worker 1 never reach subscribers on Worker 2.
-#
-# Single-process mode ensures all WebSocket connections share the same
-# subscription registry, enabling proper real-time event broadcasts.
-#
-# To enable clustered mode in the future, you'd need cross-worker pub/sub
-# (PostgreSQL LISTEN/NOTIFY or Redis) to synchronize broadcasts.
+# Clustered mode with Redis pub/sub for cross-worker broadcasts
+# =============================================================
+# When REDIS_URL is set, enables multiple Puma workers with Redis pub/sub
+# to synchronize WebSocket event broadcasts across workers.
+# Without Redis, runs in single-process mode (all connections share state).
+if ENV["RAILS_ENV"] == "production" && ENV["REDIS_URL"]
+  workers ENV.fetch("WEB_CONCURRENCY", 2)
+  preload_app!
 
-# Graceful shutdown for WebSocket connections in single-process mode
+  on_worker_boot do
+    ActiveRecord::Base.establish_connection if defined?(ActiveRecord::Base)
+    NostrRelay::RedisPubsub.start_subscriber if defined?(NostrRelay::RedisPubsub)
+  end
+
+  on_worker_shutdown do
+    NostrRelay::RedisPubsub.stop_subscriber if defined?(NostrRelay::RedisPubsub)
+    if defined?(NostrRelay::Subscriptions) && NostrRelay::Subscriptions.connection_count > 0
+      NostrRelay::Subscriptions.shutdown
+    end
+  end
+end
+
+# Graceful shutdown (single-process mode fallback or development)
 at_exit do
+  NostrRelay::RedisPubsub.stop_subscriber if defined?(NostrRelay::RedisPubsub)
   if defined?(NostrRelay::Subscriptions) && NostrRelay::Subscriptions.connection_count > 0
     NostrRelay::Subscriptions.shutdown
   end

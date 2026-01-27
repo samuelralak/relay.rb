@@ -41,4 +41,11 @@ Rails.application.config.after_initialize do
 
   # Validate all required adapters are configured
   NostrRelay::Config.validate!
+
+  # Log Redis pub/sub status
+  if defined?(NostrRelay::RedisPubsub) && NostrRelay::RedisPubsub.enabled?
+    Rails.logger.info("[NostrRelay] Redis pub/sub enabled for cross-worker broadcasts")
+  else
+    Rails.logger.info("[NostrRelay] Redis pub/sub disabled (REDIS_URL not set)")
+  end
 end
