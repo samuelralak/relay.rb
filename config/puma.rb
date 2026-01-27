@@ -53,9 +53,9 @@ end
 
 # Clustered mode with Redis pub/sub for cross-worker broadcasts
 # =============================================================
-# When REDIS_URL is set, enables multiple Puma workers with Redis pub/sub
-# to synchronize WebSocket event broadcasts across workers.
-# Without Redis, runs in single-process mode (all connections share state).
+# Each worker maintains its own WebSocket connections. Redis pub/sub
+# synchronizes event broadcasts across workers so all connected clients
+# receive events regardless of which worker they're connected to.
 if ENV["RAILS_ENV"] == "production" && ENV["REDIS_URL"]
   workers ENV.fetch("WEB_CONCURRENCY", 2)
   preload_app!
