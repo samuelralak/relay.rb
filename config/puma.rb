@@ -33,6 +33,11 @@ threads threads_count, threads_count
 # Specifies the `port` that Puma will listen on to receive requests; default is 3000.
 port ENV.fetch("PORT", 3000)
 
+# Heroku requires ≥90s idle timeout to avoid race conditions with router keep-alive
+# See: https://devcenter.heroku.com/articles/http-routing#timeouts
+persistent_timeout ENV.fetch("PUMA_PERSISTENT_TIMEOUT", 90).to_i
+first_data_timeout ENV.fetch("PUMA_FIRST_DATA_TIMEOUT", 30).to_i
+
 # Allow puma to be restarted by `bin/rails restart` command.
 plugin :tmp_restart
 

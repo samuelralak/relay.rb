@@ -10,7 +10,11 @@ module NostrRelay
       end
 
       def call(env)
-        if Faye::WebSocket.websocket?(env)
+        # Debug: Log WebSocket detection
+        is_websocket = Faye::WebSocket.websocket?(env)
+        Config.logger.debug("[NostrRelay::Middleware] Request: websocket=#{is_websocket}, upgrade=#{env['HTTP_UPGRADE']}, connection=#{env['HTTP_CONNECTION']}")
+
+        if is_websocket
           ws = Faye::WebSocket.new(env, nil, websocket_options)
           connection = NostrRelay::Connection.new(ws)
 
