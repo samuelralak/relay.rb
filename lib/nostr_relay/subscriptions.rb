@@ -168,7 +168,7 @@ module NostrRelay
           next unless connection
 
           subs.each do |sub_id, subscription|
-            next unless subscription.matches_data?(event_data)
+            next unless matches_with_search?(subscription, event_data)
 
             unless send_to_connection(connection, sub_id, event_data)
               dead_connections << conn_id
