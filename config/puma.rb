@@ -52,6 +52,7 @@ if ENV["RAILS_ENV"] == "production"
   require "barnes"
 
   before_fork do
+    ActiveRecord::Base.connection_pool.disconnect! if defined?(ActiveRecord::Base)
     Barnes.start
   end
 end

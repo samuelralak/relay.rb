@@ -82,9 +82,16 @@ module NostrRelay
       json = payload.to_json
       Config.logger.debug("[NostrRelay] Sending to #{@id}: #{json[0..100]}...")
 
-      @send_mutex.synchronize do
-        result = @ws.send(json)
-        Config.logger.debug("[NostrRelay] Send result for #{@id}: #{result.inspect}")
+      if defined?(EventMachine) && EventMachine.reactor_running?
+        EventMachine.schedule do
+          @ws.send(json)
+          Config.logger.debug("[NostrRelay] Sent via EM to #{@id}")
+        end
+      else
+        @send_mutex.synchronize do
+          result = @ws.send(json)
+          Config.logger.debug("[NostrRelay] Send result for #{@id}: #{result.inspect}")
+        end
       end
     rescue StandardError => e
       Config.logger.error("[NostrRelay] Failed to send message to #{@id}: #{e.class}: #{e.message}")

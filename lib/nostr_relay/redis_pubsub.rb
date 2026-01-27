@@ -105,7 +105,11 @@ module NostrRelay
             backoff = 1 # Reset on success
 
             @subscriber_redis.subscribe(CHANNEL) do |on|
-              on.message { |_, msg| handle_message(msg) }
+              on.message do |_, msg|
+                Rails.application.executor.wrap do
+                  handle_message(msg)
+                end
+              end
             end
           rescue Redis::BaseConnectionError => e
             break if @shutdown

@@ -19,19 +19,35 @@ module NostrRelay
           connection = NostrRelay::Connection.new(ws)
 
           ws.on :open do |_event|
-            connection.on_open
+            Thread.new do
+              Rails.application.executor.wrap do
+                connection.on_open
+              end
+            end
           end
 
           ws.on :message do |event|
-            connection.on_message(event.data)
+            Thread.new do
+              Rails.application.executor.wrap do
+                connection.on_message(event.data)
+              end
+            end
           end
 
           ws.on :close do |event|
-            connection.on_close(event.code, event.reason)
+            Thread.new do
+              Rails.application.executor.wrap do
+                connection.on_close(event.code, event.reason)
+              end
+            end
           end
 
           ws.on :error do |event|
-            connection.on_error(event)
+            Thread.new do
+              Rails.application.executor.wrap do
+                connection.on_error(event)
+              end
+            end
           end
 
           ws.rack_response
