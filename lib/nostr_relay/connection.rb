@@ -21,6 +21,8 @@ module NostrRelay
     end
 
     def on_message(data)
+      Config.logger.debug("[NostrRelay] Received from #{@id}: #{data[0..100]}...")
+
       # Enforce message size limit before processing
       max_length = Config.max_message_length
       if data.bytesize > max_length
@@ -77,11 +79,16 @@ module NostrRelay
 
     # Thread-safe message sending to prevent corruption from concurrent writes
     def send_message(payload)
+      json = payload.to_json
+      Config.logger.debug("[NostrRelay] Sending to #{@id}: #{json[0..100]}...")
+
       @send_mutex.synchronize do
-        @ws.send(payload.to_json)
+        result = @ws.send(json)
+        Config.logger.debug("[NostrRelay] Send result for #{@id}: #{result.inspect}")
       end
     rescue StandardError => e
-      Config.logger.error("[NostrRelay] Failed to send message to #{@id}: #{e.message}")
+      Config.logger.error("[NostrRelay] Failed to send message to #{@id}: #{e.class}: #{e.message}")
+      Config.logger.error(e.backtrace&.first(5)&.join("\n"))
     end
   end
 end

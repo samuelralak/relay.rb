@@ -73,12 +73,9 @@ if ENV["RAILS_ENV"] == "production" && ENV["REDIS_URL"]
     ActiveRecord::Base.establish_connection if defined?(ActiveRecord::Base)
     NostrRelay::RedisPubsub.start_subscriber if defined?(NostrRelay::RedisPubsub)
 
-    # Start EventMachine reactor for faye-websocket in each worker
-    # EventMachine doesn't survive fork, so each worker needs its own reactor
-    if defined?(EventMachine) && !EventMachine.reactor_running?
-      Thread.new { EventMachine.run }
-      sleep 0.1 until EventMachine.reactor_running?
-      puts "[Puma Worker] EventMachine reactor started"
+    # Log EventMachine status for debugging WebSocket issues
+    if defined?(EventMachine)
+      puts "[Puma Worker] EventMachine reactor running: #{EventMachine.reactor_running?}"
     end
   end
 
@@ -86,12 +83,6 @@ if ENV["RAILS_ENV"] == "production" && ENV["REDIS_URL"]
     NostrRelay::RedisPubsub.stop_subscriber if defined?(NostrRelay::RedisPubsub)
     if defined?(NostrRelay::Subscriptions) && NostrRelay::Subscriptions.connection_count > 0
       NostrRelay::Subscriptions.shutdown
-    end
-
-    # Stop EventMachine reactor
-    if defined?(EventMachine) && EventMachine.reactor_running?
-      EventMachine.stop_event_loop
-      puts "[Puma Worker] EventMachine reactor stopped"
     end
   end
 end
