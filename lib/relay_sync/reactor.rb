@@ -19,14 +19,18 @@ module RelaySync
         return if @running
 
         @running = true
-        @thread = Thread.new do
-          EM.run do
-            # Reactor is now running
-          end
-        end
 
-        # Wait for reactor to start
-        sleep 0.1 until EM.reactor_running?
+        # If EM is already running (e.g. started by Puma), we don't need to start a new thread
+        unless EM.reactor_running?
+          @thread = Thread.new do
+            EM.run do
+              # Reactor is now running
+            end
+          end
+
+          # Wait for reactor to start
+          sleep 0.1 until EM.reactor_running?
+        end
       end
     end
 
@@ -34,10 +38,14 @@ module RelaySync
       @mutex.synchronize do
         return unless @running
 
-        EM.stop_event_loop if EM.reactor_running?
-        @thread&.join(5)
+        # Only stop EM if we started it (we have a thread)
+        if @thread
+          EM.stop_event_loop if EM.reactor_running?
+          @thread.join(5)
+          @thread = nil
+        end
+
         @running = false
-        @thread = nil
       end
     end
 

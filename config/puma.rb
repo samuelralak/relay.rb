@@ -70,16 +70,18 @@ if ENV["RAILS_ENV"] == "production" && ENV["REDIS_URL"]
   worker_shutdown_timeout 20
 
   on_worker_boot do
+    # Reset Redis state to ensure fork safety (clear any inherited pools)
+    NostrRelay::RedisPubsub.reset! if defined?(NostrRelay::RedisPubsub)
+
     ActiveRecord::Base.establish_connection if defined?(ActiveRecord::Base)
 
-    # Start EventMachine reactor in background thread for faye-websocket
+    NostrRelay::RedisPubsub.start_subscriber if defined?(NostrRelay::RedisPubsub)
+
     if defined?(EventMachine) && !EventMachine.reactor_running?
       Thread.new { EventMachine.run }
       sleep 0.1 # Allow reactor to start
       puts "[Puma Worker] EventMachine reactor started: #{EventMachine.reactor_running?}"
     end
-
-    NostrRelay::RedisPubsub.start_subscriber if defined?(NostrRelay::RedisPubsub)
   end
 
   on_worker_shutdown do
