@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "json"
+require "openssl"
 require "securerandom"
 
 module NostrRelay
@@ -72,10 +73,23 @@ module NostrRelay
         ENV["REDIS_URL"]
       end
 
+      # Redis connection options
+      # Heroku Redis uses rediss:// with self-signed certificates
+      def redis_options
+        options = { url: redis_url }
+
+        # Skip SSL verification for Heroku Redis (uses self-signed certs)
+        if redis_url&.start_with?("rediss://")
+          options[:ssl_params] = { verify_mode: OpenSSL::SSL::VERIFY_NONE }
+        end
+
+        options
+      end
+
       # Connection pool for publishing (thread-safe)
       def redis_pool
         @redis_pool ||= ConnectionPool.new(size: 5, timeout: 5) do
-          Redis.new(url: redis_url)
+          Redis.new(**redis_options)
         end
       end
 
@@ -87,7 +101,7 @@ module NostrRelay
           break if @shutdown
 
           begin
-            @subscriber_redis = Redis.new(url: redis_url)
+            @subscriber_redis = Redis.new(**redis_options)
             backoff = 1 # Reset on success
 
             @subscriber_redis.subscribe(CHANNEL) do |on|
