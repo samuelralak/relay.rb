@@ -69,7 +69,7 @@ if ENV["RAILS_ENV"] == "production" && ENV["REDIS_URL"]
   # Critical for WebSocket apps - without it, workers wait forever for connections
   worker_shutdown_timeout 20
 
-  before_worker_boot do
+  on_worker_boot do
     ActiveRecord::Base.establish_connection if defined?(ActiveRecord::Base)
     NostrRelay::RedisPubsub.start_subscriber if defined?(NostrRelay::RedisPubsub)
 
@@ -79,7 +79,7 @@ if ENV["RAILS_ENV"] == "production" && ENV["REDIS_URL"]
     end
   end
 
-  before_worker_shutdown do
+  on_worker_shutdown do
     NostrRelay::RedisPubsub.stop_subscriber if defined?(NostrRelay::RedisPubsub)
     if defined?(NostrRelay::Subscriptions) && NostrRelay::Subscriptions.connection_count > 0
       NostrRelay::Subscriptions.shutdown
