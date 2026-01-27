@@ -77,25 +77,17 @@ module NostrRelay
 
     private
 
-    # Thread-safe message sending to prevent corruption from concurrent writes
+    # Thread-safe message sending
+    # faye-websocket buffers writes, mutex prevents concurrent corruption
     def send_message(payload)
       json = payload.to_json
       Config.logger.debug("[NostrRelay] Sending to #{@id}: #{json[0..100]}...")
 
-      if defined?(EventMachine) && EventMachine.reactor_running?
-        EventMachine.schedule do
-          @ws.send(json)
-          Config.logger.debug("[NostrRelay] Sent via EM to #{@id}")
-        end
-      else
-        @send_mutex.synchronize do
-          result = @ws.send(json)
-          Config.logger.debug("[NostrRelay] Send result for #{@id}: #{result.inspect}")
-        end
+      @send_mutex.synchronize do
+        @ws.send(json)
       end
     rescue StandardError => e
       Config.logger.error("[NostrRelay] Failed to send message to #{@id}: #{e.class}: #{e.message}")
-      Config.logger.error(e.backtrace&.first(5)&.join("\n"))
     end
   end
 end
