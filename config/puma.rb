@@ -57,6 +57,11 @@ workers ENV.fetch("WEB_CONCURRENCY", 2) if ENV["RAILS_ENV"] == "production"
 # Preload app for faster worker boot (copy-on-write memory savings)
 preload_app! if ENV["RAILS_ENV"] == "production"
 
+# Force workers to shutdown after 20s (Heroku gives 30s total)
+# This is critical for WebSocket apps - without it, workers wait forever
+# for long-lived connections to finish, and before_worker_shutdown never runs
+worker_shutdown_timeout 20 if ENV["RAILS_ENV"] == "production"
+
 # Re-establish database connections in workers after fork
 # Required when using preload_app! since master's connections don't work in workers
 before_worker_boot do
