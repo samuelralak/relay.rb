@@ -60,12 +60,16 @@ if ENV["RAILS_ENV"] == "production" && ENV["REDIS_URL"]
   workers ENV.fetch("WEB_CONCURRENCY", 2)
   preload_app!
 
-  on_worker_boot do
+  # Force workers to shutdown after 20s (Heroku gives 30s total)
+  # Critical for WebSocket apps - without it, workers wait forever for connections
+  worker_shutdown_timeout 20
+
+  before_worker_boot do
     ActiveRecord::Base.establish_connection if defined?(ActiveRecord::Base)
     NostrRelay::RedisPubsub.start_subscriber if defined?(NostrRelay::RedisPubsub)
   end
 
-  on_worker_shutdown do
+  before_worker_shutdown do
     NostrRelay::RedisPubsub.stop_subscriber if defined?(NostrRelay::RedisPubsub)
     if defined?(NostrRelay::Subscriptions) && NostrRelay::Subscriptions.connection_count > 0
       NostrRelay::Subscriptions.shutdown

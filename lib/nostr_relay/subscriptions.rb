@@ -159,6 +159,8 @@ module NostrRelay
 
       # Broadcast ephemeral event to local subscribers only
       def broadcast_ephemeral_locally(event_data)
+        return if event_expired?(event_data) # NIP-40: Ephemeral events can also expire
+
         dead_connections = []
 
         subscriptions.each do |conn_id, subs|
