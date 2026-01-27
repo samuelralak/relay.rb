@@ -16,7 +16,7 @@ module NostrRelay
       def publish(type:, data:)
         return unless enabled?
 
-        message = { type: type.to_s, data: data, worker_id: worker_id }.to_json
+        message = { type: type.to_s, data:, worker_id: }.to_json
         redis_pool.with { |conn| conn.publish(CHANNEL, message) }
       rescue Redis::BaseError => e
         Config.logger.error("[RedisPubsub] Publish failed: #{e.message}")
@@ -97,12 +97,12 @@ module NostrRelay
             break if @shutdown
             Config.logger.warn("[RedisPubsub] Reconnecting in #{backoff}s: #{e.message}")
             sleep backoff
-            backoff = [backoff * 2, 30].min # Exponential backoff, max 30s
+            backoff = [ backoff * 2, 30 ].min # Exponential backoff, max 30s
           rescue StandardError => e
             break if @shutdown
             Config.logger.error("[RedisPubsub] Error: #{e.class}: #{e.message}")
             sleep backoff
-            backoff = [backoff * 2, 30].min
+            backoff = [ backoff * 2, 30 ].min
           end
         end
       end

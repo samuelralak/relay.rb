@@ -207,11 +207,11 @@ module NostrRelay
           next false if filter["until"] && data["created_at"] > filter["until"]
 
           # Tag filters
-          tag_match = filter.all? do |key, values|
+          tag_match = filter.all? { |key, values|
             next true unless key.match?(/\A#[a-zA-Z]\z/)
             tag_name = key[1]
             tag_matches_data?(tag_name, Array(values), data["tags"])
-          end
+          }
           next false unless tag_match
 
           # NIP-50: Search filter

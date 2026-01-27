@@ -77,6 +77,105 @@ module NostrRelay
       end
     end
 
+    # =========================================================================
+    # Message Handling
+    # =========================================================================
+
+    test "handle_message skips messages from same worker" do
+      connection = NostrTestHelpers::MockConnection.new
+      Subscriptions.register(connection)
+      Subscriptions.subscribe(connection_id: connection.id, sub_id: "sub1", filters: [ { kinds: [ 1 ] } ])
+
+      # Create message with same worker_id
+      message = {
+        type: "event",
+        worker_id: RedisPubsub.worker_id,  # Same as current worker
+        data: {
+          "id" => SecureRandom.hex(32),
+          "pubkey" => SecureRandom.hex(32),
+          "created_at" => Time.now.to_i,
+          "kind" => 1,
+          "tags" => [],
+          "content" => "test",
+          "sig" => SecureRandom.hex(64)
+        }
+      }.to_json
+
+      # Should skip own message
+      RedisPubsub.send(:handle_message, message)
+
+      assert_empty connection.sent_messages
+    end
+
+    test "handle_message processes event type from other worker" do
+      connection = NostrTestHelpers::MockConnection.new
+      Subscriptions.register(connection)
+      Subscriptions.subscribe(connection_id: connection.id, sub_id: "sub1", filters: [ { kinds: [ 1 ] } ])
+
+      # Create message with different worker_id
+      message = {
+        type: "event",
+        worker_id: "other-worker-#{SecureRandom.hex(4)}",
+        data: {
+          "id" => SecureRandom.hex(32),
+          "pubkey" => SecureRandom.hex(32),
+          "created_at" => Time.now.to_i,
+          "kind" => 1,
+          "tags" => [],
+          "content" => "from other worker",
+          "sig" => SecureRandom.hex(64)
+        }
+      }.to_json
+
+      RedisPubsub.send(:handle_message, message)
+
+      event_messages = connection.sent_messages.select { |m| m[0] == "EVENT" }
+      assert_equal 1, event_messages.count
+    end
+
+    test "handle_message processes ephemeral type from other worker" do
+      connection = NostrTestHelpers::MockConnection.new
+      Subscriptions.register(connection)
+      Subscriptions.subscribe(connection_id: connection.id, sub_id: "sub1", filters: [ { kinds: [ 20000 ] } ])
+
+      message = {
+        type: "ephemeral",
+        worker_id: "other-worker-#{SecureRandom.hex(4)}",
+        data: {
+          "id" => SecureRandom.hex(32),
+          "pubkey" => SecureRandom.hex(32),
+          "created_at" => Time.now.to_i,
+          "kind" => 20000,
+          "tags" => [],
+          "content" => "ephemeral from other worker",
+          "sig" => SecureRandom.hex(64)
+        }
+      }.to_json
+
+      RedisPubsub.send(:handle_message, message)
+
+      event_messages = connection.sent_messages.select { |m| m[0] == "EVENT" }
+      assert_equal 1, event_messages.count
+    end
+
+    test "handle_message handles invalid JSON gracefully" do
+      assert_nothing_raised do
+        RedisPubsub.send(:handle_message, "not valid json {{{")
+      end
+    end
+
+    test "handle_message handles unknown type gracefully" do
+      message = {
+        type: "unknown_type",
+        worker_id: "other-worker",
+        data: {}
+      }.to_json
+
+      assert_nothing_raised do
+        RedisPubsub.send(:handle_message, message)
+      end
+    end
+
     private
 
     def with_env(env_vars)

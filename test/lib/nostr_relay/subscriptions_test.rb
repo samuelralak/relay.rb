@@ -256,6 +256,261 @@ module NostrRelay
     end
 
     # =========================================================================
+    # Remote Broadcasts (from Redis pub/sub)
+    # =========================================================================
+
+    test "broadcast_remote sends to matching subscriptions" do
+      Subscriptions.register(@connection)
+      Subscriptions.subscribe(connection_id: @connection.id, sub_id: "sub1", filters: [ { kinds: [ 1 ] } ])
+
+      event_hash = {
+        "id" => SecureRandom.hex(32),
+        "pubkey" => SecureRandom.hex(32),
+        "created_at" => Time.now.to_i,
+        "kind" => 1,
+        "tags" => [],
+        "content" => "hello",
+        "sig" => SecureRandom.hex(64)
+      }
+
+      Subscriptions.broadcast_remote(event_hash)
+
+      event_messages = @connection.sent_messages.select { |m| m[0] == "EVENT" }
+      assert_equal 1, event_messages.count
+    end
+
+    test "broadcast_ephemeral_remote sends to matching subscriptions" do
+      Subscriptions.register(@connection)
+      Subscriptions.subscribe(connection_id: @connection.id, sub_id: "sub1", filters: [ { kinds: [ 20000 ] } ])
+
+      event_data = {
+        "id" => SecureRandom.hex(32),
+        "pubkey" => SecureRandom.hex(32),
+        "created_at" => Time.now.to_i,
+        "kind" => 20000,
+        "tags" => [],
+        "content" => "ephemeral",
+        "sig" => SecureRandom.hex(64)
+      }
+
+      Subscriptions.broadcast_ephemeral_remote(event_data)
+
+      event_messages = @connection.sent_messages.select { |m| m[0] == "EVENT" }
+      assert_equal 1, event_messages.count
+    end
+
+    # =========================================================================
+    # NIP-40: Expiration Filtering
+    # =========================================================================
+
+    test "broadcast_locally skips expired events" do
+      Subscriptions.register(@connection)
+      Subscriptions.subscribe(connection_id: @connection.id, sub_id: "sub1", filters: [ { kinds: [ 1 ] } ])
+
+      # Event with past expiration
+      expired_event = {
+        "id" => SecureRandom.hex(32),
+        "pubkey" => SecureRandom.hex(32),
+        "created_at" => Time.now.to_i,
+        "kind" => 1,
+        "tags" => [ [ "expiration", (Time.now.to_i - 3600).to_s ] ], # Expired 1 hour ago
+        "content" => "expired",
+        "sig" => SecureRandom.hex(64)
+      }
+
+      Subscriptions.broadcast_remote(expired_event)
+
+      assert_empty @connection.sent_messages
+    end
+
+    test "broadcast_locally sends non-expired events" do
+      Subscriptions.register(@connection)
+      Subscriptions.subscribe(connection_id: @connection.id, sub_id: "sub1", filters: [ { kinds: [ 1 ] } ])
+
+      # Event with future expiration
+      valid_event = {
+        "id" => SecureRandom.hex(32),
+        "pubkey" => SecureRandom.hex(32),
+        "created_at" => Time.now.to_i,
+        "kind" => 1,
+        "tags" => [ [ "expiration", (Time.now.to_i + 3600).to_s ] ], # Expires in 1 hour
+        "content" => "valid",
+        "sig" => SecureRandom.hex(64)
+      }
+
+      Subscriptions.broadcast_remote(valid_event)
+
+      event_messages = @connection.sent_messages.select { |m| m[0] == "EVENT" }
+      assert_equal 1, event_messages.count
+    end
+
+    test "broadcast_ephemeral_locally skips expired events" do
+      Subscriptions.register(@connection)
+      Subscriptions.subscribe(connection_id: @connection.id, sub_id: "sub1", filters: [ { kinds: [ 20000 ] } ])
+
+      expired_event = {
+        "id" => SecureRandom.hex(32),
+        "pubkey" => SecureRandom.hex(32),
+        "created_at" => Time.now.to_i,
+        "kind" => 20000,
+        "tags" => [ [ "expiration", (Time.now.to_i - 3600).to_s ] ],
+        "content" => "expired",
+        "sig" => SecureRandom.hex(64)
+      }
+
+      Subscriptions.broadcast_ephemeral_remote(expired_event)
+
+      assert_empty @connection.sent_messages
+    end
+
+    # =========================================================================
+    # NIP-50: Search Filter Matching
+    # =========================================================================
+
+    test "broadcast matches search filter" do
+      Subscriptions.register(@connection)
+      Subscriptions.subscribe(
+        connection_id: @connection.id,
+        sub_id: "sub1",
+        filters: [ { kinds: [ 1 ], search: "hello world" } ]
+      )
+
+      matching_event = {
+        "id" => SecureRandom.hex(32),
+        "pubkey" => SecureRandom.hex(32),
+        "created_at" => Time.now.to_i,
+        "kind" => 1,
+        "tags" => [],
+        "content" => "this is a hello world test",
+        "sig" => SecureRandom.hex(64)
+      }
+
+      Subscriptions.broadcast_remote(matching_event)
+
+      event_messages = @connection.sent_messages.select { |m| m[0] == "EVENT" }
+      assert_equal 1, event_messages.count
+    end
+
+    test "broadcast skips non-matching search filter" do
+      Subscriptions.register(@connection)
+      Subscriptions.subscribe(
+        connection_id: @connection.id,
+        sub_id: "sub1",
+        filters: [ { kinds: [ 1 ], search: "hello world" } ]
+      )
+
+      non_matching_event = {
+        "id" => SecureRandom.hex(32),
+        "pubkey" => SecureRandom.hex(32),
+        "created_at" => Time.now.to_i,
+        "kind" => 1,
+        "tags" => [],
+        "content" => "this is just hello",  # Missing "world"
+        "sig" => SecureRandom.hex(64)
+      }
+
+      Subscriptions.broadcast_remote(non_matching_event)
+
+      assert_empty @connection.sent_messages
+    end
+
+    # =========================================================================
+    # Tag Filter Matching
+    # =========================================================================
+
+    test "broadcast matches tag filter" do
+      Subscriptions.register(@connection)
+      target_pubkey = SecureRandom.hex(32)
+      Subscriptions.subscribe(
+        connection_id: @connection.id,
+        sub_id: "sub1",
+        filters: [ { kinds: [ 1 ], "#p": [ target_pubkey ] } ]
+      )
+
+      matching_event = {
+        "id" => SecureRandom.hex(32),
+        "pubkey" => SecureRandom.hex(32),
+        "created_at" => Time.now.to_i,
+        "kind" => 1,
+        "tags" => [ [ "p", target_pubkey ] ],
+        "content" => "mentioning someone",
+        "sig" => SecureRandom.hex(64)
+      }
+
+      Subscriptions.broadcast_remote(matching_event)
+
+      event_messages = @connection.sent_messages.select { |m| m[0] == "EVENT" }
+      assert_equal 1, event_messages.count
+    end
+
+    test "broadcast skips non-matching tag filter" do
+      Subscriptions.register(@connection)
+      Subscriptions.subscribe(
+        connection_id: @connection.id,
+        sub_id: "sub1",
+        filters: [ { kinds: [ 1 ], "#p": [ SecureRandom.hex(32) ] } ]
+      )
+
+      non_matching_event = {
+        "id" => SecureRandom.hex(32),
+        "pubkey" => SecureRandom.hex(32),
+        "created_at" => Time.now.to_i,
+        "kind" => 1,
+        "tags" => [ [ "p", SecureRandom.hex(32) ] ],  # Different pubkey
+        "content" => "mentioning someone else",
+        "sig" => SecureRandom.hex(64)
+      }
+
+      Subscriptions.broadcast_remote(non_matching_event)
+
+      assert_empty @connection.sent_messages
+    end
+
+    # =========================================================================
+    # Time Range Filter Matching
+    # =========================================================================
+
+    test "broadcast respects since filter" do
+      Subscriptions.register(@connection)
+      cutoff = Time.now.to_i - 3600  # 1 hour ago
+
+      Subscriptions.subscribe(
+        connection_id: @connection.id,
+        sub_id: "sub1",
+        filters: [ { kinds: [ 1 ], since: cutoff } ]
+      )
+
+      # Event created before cutoff - should not match
+      old_event = {
+        "id" => SecureRandom.hex(32),
+        "pubkey" => SecureRandom.hex(32),
+        "created_at" => cutoff - 100,  # Before cutoff
+        "kind" => 1,
+        "tags" => [],
+        "content" => "old",
+        "sig" => SecureRandom.hex(64)
+      }
+
+      Subscriptions.broadcast_remote(old_event)
+      assert_empty @connection.sent_messages
+
+      # Event created after cutoff - should match
+      new_event = {
+        "id" => SecureRandom.hex(32),
+        "pubkey" => SecureRandom.hex(32),
+        "created_at" => cutoff + 100,  # After cutoff
+        "kind" => 1,
+        "tags" => [],
+        "content" => "new",
+        "sig" => SecureRandom.hex(64)
+      }
+
+      Subscriptions.broadcast_remote(new_event)
+      event_messages = @connection.sent_messages.select { |m| m[0] == "EVENT" }
+      assert_equal 1, event_messages.count
+    end
+
+    # =========================================================================
     # Thread Safety
     # =========================================================================
 
