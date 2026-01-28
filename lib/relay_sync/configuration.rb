@@ -3,6 +3,7 @@
 module RelaySync
   class Configuration
     attr_accessor :relay_provider
+    attr_writer :relay_private_key
 
     # Delegate relay queries to provider
     def enabled_relays      = relay_provider.enabled
@@ -16,6 +17,12 @@ module RelaySync
     # For per-relay settings, use relay.config instead
     def sync_settings
       @sync_settings ||= relay_provider.new.config
+    end
+
+    # NIP-42: Private key for authenticating to upstream relays
+    # Can be set via configuration or environment variable
+    def relay_private_key
+      @relay_private_key || ENV["RELAY_PRIVATE_KEY"]
     end
   end
 end

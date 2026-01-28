@@ -184,9 +184,40 @@ module RelaySync
     end
 
     def handle_auth(connection, challenge)
-      # NIP-42 authentication challenge received
-      # Currently just logs - full implementation requires signing capability
-      tagged_logger.warn "AUTH challenge - authentication not implemented", url: connection.url
+      # NIP-42: Authentication challenge received from upstream relay
+      tagged_logger.info "AUTH challenge received", url: connection.url
+
+      private_key = RelaySync.configuration.relay_private_key
+      unless private_key
+        tagged_logger.warn "Cannot authenticate - no private key configured", url: connection.url
+        return
+      end
+
+      # Build signed AUTH event
+      result = ::Auth::BuildAuthEvent.call(
+        challenge:,
+        relay_url: connection.url,
+        private_key:
+      )
+
+      case result
+      in Dry::Monads::Success(event:)
+        event_id = event["id"]
+
+        # Register OK handler to track auth success/failure
+        register_ok_handler(event_id) do |success, message|
+          if success
+            tagged_logger.info "AUTH succeeded", url: connection.url
+          else
+            tagged_logger.warn "AUTH rejected", url: connection.url, message:
+          end
+        end
+
+        connection.send_auth_response(event)
+        tagged_logger.info "AUTH response sent", url: connection.url, event_id: event_id[0..15]
+      in Dry::Monads::Failure[ _, message ]
+        tagged_logger.error "Failed to build AUTH event", url: connection.url, error: message
+      end
     end
 
     def handle_closed(connection, subscription_id, message)

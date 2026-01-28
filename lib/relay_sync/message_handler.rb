@@ -84,6 +84,13 @@ module RelaySync
       [ Negentropy::MessageType::NEG_CLOSE, subscription_id ]
     end
 
+    # Build an AUTH response message (NIP-42)
+    # @param event [Hash] signed kind 22242 auth event
+    # @return [Array] AUTH message array
+    def build_auth_response(event)
+      [ Messages::Outbound::AUTH, event ]
+    end
+
     # Validate a Nostr event structure
     # @param event [Hash] event to validate
     # @return [Boolean] true if valid

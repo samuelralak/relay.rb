@@ -93,6 +93,12 @@ module RelaySync
       send_message([ Negentropy::MessageType::NEG_CLOSE, subscription_id ])
     end
 
+    # Send AUTH response (NIP-42)
+    # @param event [Hash] signed kind 22242 authentication event
+    def send_auth_response(event)
+      send_message(MessageHandler.build_auth_response(event))
+    end
+
     def connected?
       state == :connected
     end
