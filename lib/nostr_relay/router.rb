@@ -50,6 +50,14 @@ module NostrRelay
         end
         Handlers::Close.call(connection:, sub_id: message[1])
 
+      when Messages::Inbound::AUTH
+        # AUTH requires: ["AUTH", <signed event object>] (NIP-42)
+        unless message.size >= 2 && message[1].is_a?(Hash)
+          connection.send_notice("#{Messages::Prefix::ERROR} AUTH message requires a signed event")
+          return
+        end
+        Handlers::Auth.call(connection:, payload: message[1])
+
       else
         connection.send_notice("#{Messages::Prefix::ERROR} unknown message type '#{type}'")
       end
