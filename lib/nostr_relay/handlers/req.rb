@@ -19,6 +19,15 @@ module NostrRelay
           return
         end
 
+        # NIP-42: Check if filters request restricted kinds (DMs, gift wraps)
+        if requires_auth_for_filters?(filters) && !connection.authenticated?
+          connection.send_closed(
+            sub_id,
+            Messages::Prefix.build(Messages::Prefix::AUTH_REQUIRED, "we can't serve DMs to unauthenticated users")
+          )
+          return
+        end
+
         result = Contracts::FiltersContract.new.call(filters:)
         unless result.success?
           connection.send_closed(sub_id, "#{Messages::Prefix::ERROR} #{result.errors[:filters].first}")
@@ -46,6 +55,19 @@ module NostrRelay
 
       def valid_sub_id?(sub_id)
         sub_id.is_a?(String) && sub_id.length.between?(1, Config.max_subid_length)
+      end
+
+      # NIP-42: Check if filters request kinds that require authentication
+      def requires_auth_for_filters?(filters)
+        return false unless Config.restrict_dm_access?
+
+        # NIP-04 DMs (kind 4) and NIP-59 gift wraps (kind 1059)
+        restricted_kinds = [ Events::Kinds::ENCRYPTED_DM, Events::Kinds::GIFT_WRAP ]
+
+        filters.any? do |filter|
+          kinds = filter["kinds"] || filter[:kinds] || []
+          (kinds & restricted_kinds).any?
+        end
       end
 
       def send_historical_events(connection, sub_id, filters)
