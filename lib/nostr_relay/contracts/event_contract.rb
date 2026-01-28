@@ -4,9 +4,10 @@ require "dry/validation"
 
 module NostrRelay
   module Contracts
+    # Validates standard Nostr event structure per NIP-01.
+    # Includes relay-specific limits and NIP-40 expiration handling.
     class EventContract < Dry::Validation::Contract
-      HEX64 = /\A[a-f0-9]{64}\z/i
-      HEX128 = /\A[a-f0-9]{128}\z/i
+      include EventConstants
 
       params do
         required(:id).filled(:string)
