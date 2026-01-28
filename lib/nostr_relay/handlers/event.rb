@@ -19,6 +19,12 @@ module NostrRelay
         # Extract event_id early for error responses (may be nil if malformed)
         event_id = extract_event_id(payload)
 
+        # NIP-42/NIP-70: Check authentication requirements
+        if AuthPolicy.event_requires_auth?(payload, connection)
+          connection.send_ok(event_id, false, AuthPolicy.auth_error_message(payload, connection))
+          return
+        end
+
         result = Config.event_processor.call(event_data: payload)
 
         case result
@@ -31,11 +37,11 @@ module NostrRelay
         in Failure[ :blocked, message ]
           connection.send_ok(event_id, false, message)
         in Failure[ _, message ]
-          connection.send_ok(event_id, false, "#{Messages::Prefix::ERROR} #{message}")
+          connection.send_ok(event_id, false, Messages::Prefix.build(Messages::Prefix::ERROR, message))
         end
       rescue StandardError => e
         Event.tagged_logger.error "Event handler error", error: "#{e.class}: #{e.message}"
-        connection.send_ok(extract_event_id(payload), false, "#{Messages::Prefix::ERROR} internal error")
+        connection.send_ok(extract_event_id(payload), false, Messages::Prefix.build(Messages::Prefix::ERROR, "internal error"))
       end
 
       def extract_event_id(payload)
