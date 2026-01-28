@@ -88,6 +88,12 @@ module NostrRelay
       def auth_required?        = limit_value(:auth_required, false)
       def payment_required?     = limit_value(:payment_required, false)
 
+      # NIP-42: Authentication configuration
+      def auth_enabled?         = relay_url.present?
+      def relay_url             = metadata(:relay_url) || ENV["RELAY_URL"]
+      def auth_timeout          = limit_value(:auth_timeout_seconds, 600)
+      def restrict_dm_access?   = limit_value(:restrict_dm_access, false)
+
       # NIP-50: Search configuration
       def search_enabled?           = RelaySearch::Client.available? rescue false
       def search_query_max_length   = limit_value(:search_query_max_length)

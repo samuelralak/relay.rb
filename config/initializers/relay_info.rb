@@ -7,9 +7,10 @@ Rails.application.config.relay_info = {
   description: ENV.fetch("RELAY_DESCRIPTION", "A Nostr relay built with Ruby on Rails"),
   pubkey: ENV["RELAY_PUBKEY"],
   contact: ENV["RELAY_CONTACT"],
-  supported_nips: [ 1, 9, 11, 40, 50 ],
+  supported_nips: [ 1, 9, 11, 40, 42, 50, 70 ],
   software: ENV.fetch("RELAY_SOFTWARE", "https://github.com/samuelralak/relay.rb"),
   version: ENV.fetch("RELAY_VERSION", "0.1.0"),
+  relay_url: ENV["RELAY_URL"],  # NIP-42: Required for AUTH challenge validation
   limitation: {
     max_message_length: 16_384,
     max_subscriptions: 20,
@@ -19,8 +20,10 @@ Rails.application.config.relay_info = {
     max_event_tags: 100,
     max_content_length: 65_535,
     default_limit: 500,
-    auth_required: false,
+    auth_required: ENV.fetch("AUTH_REQUIRED", "false") == "true",  # NIP-42: require auth for ALL events
     payment_required: false,
+    restrict_dm_access: ENV.fetch("RESTRICT_DM_ACCESS", "false") == "true",  # NIP-42: require auth for DM kinds
+    auth_timeout_seconds: 600,  # NIP-42: ±10 minutes tolerance for AUTH event timestamps
     search_query_max_length: 256,  # NIP-50
     search_max_limit: 500,         # NIP-50
     ping_interval: 20              # WebSocket keepalive (Heroku idle timeout is 55s)
