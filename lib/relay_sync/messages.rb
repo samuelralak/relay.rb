@@ -13,8 +13,9 @@ module RelaySync
       EVENT = "EVENT"
       REQ   = "REQ"
       CLOSE = "CLOSE"
+      AUTH  = "AUTH"  # NIP-42: For sending auth responses
 
-      ALL = [ EVENT, REQ, CLOSE ].freeze
+      ALL = [ EVENT, REQ, CLOSE, AUTH ].freeze
     end
 
     # Relay → Client message types (we receive these)
