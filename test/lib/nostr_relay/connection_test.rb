@@ -8,10 +8,15 @@ module NostrRelay
       @ws = NostrTestHelpers::MockWebSocket.new
       @connection = Connection.new(@ws)
       NostrRelay::Subscriptions.reset!
+      # Force EM.reactor_running? to return false for synchronous send in tests
+      @original_reactor_running = EM.method(:reactor_running?)
+      EM.define_singleton_method(:reactor_running?) { false }
     end
 
     teardown do
       NostrRelay::Subscriptions.reset!
+      # Restore original EM.reactor_running?
+      EM.define_singleton_method(:reactor_running?, @original_reactor_running) if @original_reactor_running
     end
 
     # =========================================================================
