@@ -49,9 +49,9 @@ module NostrRelay
 
       private
 
-      def execute_async(&block)
+      def execute_async(&)
         THREAD_POOL.post do
-          Rails.application.executor.wrap(&block)
+          Rails.application.executor.wrap(&)
         rescue StandardError => e
           Config.logger.error("[NostrRelay] Thread pool error: #{e.class}: #{e.message}")
         end

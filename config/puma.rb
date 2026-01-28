@@ -71,36 +71,18 @@ if ENV["RAILS_ENV"] == "production" && ENV["REDIS_URL"]
   worker_shutdown_timeout 20
 
   on_worker_boot do
-    # Reset Redis state to ensure fork safety (clear any inherited pools)
-    NostrRelay::RedisPubsub.reset! if defined?(NostrRelay::RedisPubsub)
-
     ActiveRecord::Base.establish_connection if defined?(ActiveRecord::Base)
-
-    NostrRelay::RedisPubsub.start_subscriber if defined?(NostrRelay::RedisPubsub)
-
-    if defined?(EventMachine) && !EventMachine.reactor_running?
-      Thread.new { EventMachine.run }
-      sleep 0.1 # Allow reactor to start
-      puts "[Puma Worker] EventMachine reactor started: #{EventMachine.reactor_running?}"
-    end
+    NostrRelay::Lifecycle.on_worker_boot if defined?(NostrRelay::Lifecycle)
   end
 
   on_worker_shutdown do
-    NostrRelay::RedisPubsub.stop_subscriber if defined?(NostrRelay::RedisPubsub)
-    if defined?(NostrRelay::Subscriptions) && NostrRelay::Subscriptions.connection_count > 0
-      NostrRelay::Subscriptions.shutdown
-    end
-    EventMachine.stop if defined?(EventMachine) && EventMachine.reactor_running?
+    NostrRelay::Lifecycle.on_shutdown if defined?(NostrRelay::Lifecycle)
   end
 end
 
 # Graceful shutdown (single-process mode fallback or development)
 at_exit do
-  NostrRelay::RedisPubsub.stop_subscriber if defined?(NostrRelay::RedisPubsub)
-  if defined?(NostrRelay::Subscriptions) && NostrRelay::Subscriptions.connection_count > 0
-    NostrRelay::Subscriptions.shutdown
-  end
-  EventMachine.stop if defined?(EventMachine) && EventMachine.reactor_running?
+  NostrRelay::Lifecycle.on_shutdown if defined?(NostrRelay::Lifecycle)
 end
 
 # Also handle lowlevel_error_handler for unexpected errors

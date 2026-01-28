@@ -21,94 +21,46 @@ module RelaySync
 
     def initialize
       @connections = {}
-      @ok_handlers = {}     # event_id => callback
-      @neg_handlers = {}    # subscription_id => { reconciler:, callback:, error_callback: }
-      @eose_handlers = {}   # subscription_id => callback
-      @event_handlers = {}  # subscription_id => callback
-      @default_event_handler = nil # fallback for unmatched events
+      @handlers = HandlerRegistry.new
       @mutex = Mutex.new
     end
 
-    # Set default event handler for events without a registered subscription handler
-    # @param handler [Proc] callback receiving (connection, subscription_id, event_data)
+    # Set default event handler (delegates to HandlerRegistry)
     def on_event(&handler)
-      @default_event_handler = handler
+      @handlers.on_event(&handler)
     end
 
-    # Register an event handler for a specific subscription
-    # @param subscription_id [String] subscription ID to handle
-    # @param handler [Proc] callback receiving (connection, subscription_id, event_data)
+    # Register/unregister handlers (delegates to HandlerRegistry)
     def register_event_handler(subscription_id, &handler)
-      @mutex.synchronize do
-        if @event_handlers[subscription_id]
-          logger.warn "[RelaySync::Manager] Overwriting existing event handler for #{subscription_id}"
-        end
-        @event_handlers[subscription_id] = handler
-      end
+      @handlers.register_event_handler(subscription_id, &handler)
     end
 
-    # Unregister event handler for a subscription
     def unregister_event_handler(subscription_id)
-      @mutex.synchronize do
-        @event_handlers.delete(subscription_id)
-      end
+      @handlers.unregister_event_handler(subscription_id)
     end
 
-    # Register a handler for OK response
-    # @param event_id [String] event ID to wait for
-    # @param handler [Proc] callback receiving (success, message)
     def register_ok_handler(event_id, &handler)
-      @mutex.synchronize do
-        @ok_handlers[event_id] = handler
-      end
+      @handlers.register_ok_handler(event_id, &handler)
     end
 
-    # Unregister OK handler
     def unregister_ok_handler(event_id)
-      @mutex.synchronize do
-        @ok_handlers.delete(event_id)
-      end
+      @handlers.unregister_ok_handler(event_id)
     end
 
-    # Register a Negentropy session handler
-    # @param subscription_id [String] NEG subscription ID
-    # @param reconciler [Negentropy::Reconciler::Client] reconciler instance
-    # @param error_callback [Proc] optional callback receiving (error_message) on NEG-ERR
-    # @param callback [Proc] callback receiving (have_ids, need_ids, complete)
     def register_neg_handler(subscription_id, reconciler:, error_callback: nil, &callback)
-      @mutex.synchronize do
-        @neg_handlers[subscription_id] = {
-          reconciler:,
-          callback:,
-          error_callback:
-        }
-      end
+      @handlers.register_neg_handler(subscription_id, reconciler:, error_callback:, &callback)
     end
 
-    # Unregister Negentropy handler
     def unregister_neg_handler(subscription_id)
-      @mutex.synchronize do
-        @neg_handlers.delete(subscription_id)
-      end
+      @handlers.unregister_neg_handler(subscription_id)
     end
 
-    # Register a handler for EOSE response
-    # @param subscription_id [String] subscription ID to wait for
-    # @param handler [Proc] callback called when EOSE received
     def register_eose_handler(subscription_id, &handler)
-      @mutex.synchronize do
-        if @eose_handlers[subscription_id]
-          logger.warn "[RelaySync::Manager] Overwriting existing EOSE handler for #{subscription_id}"
-        end
-        @eose_handlers[subscription_id] = handler
-      end
+      @handlers.register_eose_handler(subscription_id, &handler)
     end
 
-    # Unregister EOSE handler
     def unregister_eose_handler(subscription_id)
-      @mutex.synchronize do
-        @eose_handlers.delete(subscription_id)
-      end
+      @handlers.unregister_eose_handler(subscription_id)
     end
 
     # Add a connection to a relay
@@ -202,27 +154,27 @@ module RelaySync
 
     def handle_event(connection, subscription_id, event_data)
       # First try subscription-specific handler
-      handler = @mutex.synchronize { @event_handlers[subscription_id] }
+      handler = @handlers.event_handler_for(subscription_id)
 
       if handler
         handler.call(connection, subscription_id, event_data)
-      elsif @default_event_handler
+      elsif @handlers.default_event_handler
         # Fall back to default handler
-        @default_event_handler.call(connection, subscription_id, event_data)
+        @handlers.default_event_handler.call(connection, subscription_id, event_data)
       end
     end
 
     def handle_eose(connection, subscription_id)
       logger.debug "[RelaySync::Manager] EOSE for #{subscription_id} from #{connection.url}"
 
-      handler = @mutex.synchronize { @eose_handlers.delete(subscription_id) }
+      handler = @handlers.consume_eose_handler(subscription_id)
       handler&.call
     end
 
     def handle_ok(connection, event_id, success, message)
       logger.debug "[RelaySync::Manager] OK for #{event_id}: #{success} - #{message}"
 
-      handler = @mutex.synchronize { @ok_handlers.delete(event_id) }
+      handler = @handlers.consume_ok_handler(event_id)
       handler&.call(success, message)
     end
 
@@ -247,7 +199,7 @@ module RelaySync
     def handle_neg_msg(connection, subscription_id, message)
       logger.debug "[RelaySync::Manager] NEG-MSG for #{subscription_id} from #{connection.url}"
 
-      handler_info = @mutex.synchronize { @neg_handlers[subscription_id] }
+      handler_info = @handlers.neg_handler_for(subscription_id)
       return unless handler_info
 
       reconciler = handler_info[:reconciler]
@@ -265,12 +217,12 @@ module RelaySync
         else
           # Reconciliation complete
           connection.neg_close(subscription_id)
-          unregister_neg_handler(subscription_id)
+          @handlers.unregister_neg_handler(subscription_id)
         end
       rescue StandardError => e
         logger.error "[RelaySync::Manager] NEG-MSG processing error: #{e.message}"
         connection.neg_close(subscription_id)
-        unregister_neg_handler(subscription_id)
+        @handlers.unregister_neg_handler(subscription_id)
       end
     end
 
@@ -278,11 +230,11 @@ module RelaySync
       logger.error "[RelaySync::Manager] NEG-ERR for #{subscription_id} from #{connection.url}: #{error}"
 
       # Get the error callback before cleaning up
-      handler_info = @mutex.synchronize { @neg_handlers[subscription_id] }
+      handler_info = @handlers.neg_handler_for(subscription_id)
       error_callback = handler_info&.dig(:error_callback)
 
       # Clean up the handler
-      unregister_neg_handler(subscription_id)
+      @handlers.unregister_neg_handler(subscription_id)
 
       # Signal the error to waiting code
       error_callback&.call(error)

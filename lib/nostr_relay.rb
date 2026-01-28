@@ -1,6 +1,9 @@
 # frozen_string_literal: true
 
 require_relative "nostr_relay/config"
+require_relative "nostr_relay/lifecycle"
+require_relative "nostr_relay/filter_matcher"
+require_relative "nostr_relay/connection_registry"
 require_relative "nostr_relay/redis_pubsub"
 require_relative "nostr_relay/messages"
 require_relative "nostr_relay/connection"

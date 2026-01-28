@@ -25,10 +25,10 @@ module Search
       response = RelaySearch::Client.client.search(
         index: RelaySearch::IndexConfig::INDEX_NAME,
         body: {
-          query: query,
+          query:,
           size: limit,
-          sort: [{ nostr_created_at: "desc" }],
-          _source: ["event_id"]
+          sort: [ { nostr_created_at: "desc" } ],
+          _source: [ "event_id" ]
         }
       )
 
@@ -65,7 +65,7 @@ module Search
                  .limit(limit)
                  .to_a
 
-      Success(events: events)
+      Success(events:)
     end
 
     def build_opensearch_query

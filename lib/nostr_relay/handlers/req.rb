@@ -88,7 +88,7 @@ module NostrRelay
 
         # Use OpenSearch for fast queries on large datasets
         # Falls back to PostgreSQL internally if unavailable or for tag filters
-        result = Search::QueryByFilters.call(filters: filters, limit: limit)
+        result = Search::QueryByFilters.call(filters:, limit:)
 
         result.value![:events].each do |event|
           connection.send_event(sub_id, Config.event_serializer.serialize(event))

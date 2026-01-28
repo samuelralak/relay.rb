@@ -7,23 +7,27 @@ module NostrRelay
   # Lives in lib/ as protocol-level infrastructure.
   #
   # Supports cross-worker broadcasts via Redis pub/sub when REDIS_URL is set.
+  # Connection management delegated to ConnectionRegistry.
   module Subscriptions
     class << self
+      # Delegate connection access to ConnectionRegistry (for backwards compatibility)
       def connections
-        @connections ||= Concurrent::Hash.new
+        ConnectionRegistry.connections
       end
 
       def subscriptions
         @subscriptions ||= Concurrent::Hash.new { |h, k| h[k] = Concurrent::Hash.new }
       end
 
+      # Register a new connection (delegates to ConnectionRegistry)
       def register(connection)
-        connections[connection.id] = connection
+        ConnectionRegistry.register(connection)
       end
 
+      # Unregister a connection and its subscriptions
       def unregister(connection_id)
         subscriptions.delete(connection_id)
-        connections.delete(connection_id)
+        ConnectionRegistry.unregister(connection_id)
       end
 
       # Returns [success, error_message]
@@ -84,52 +88,19 @@ module NostrRelay
 
       # For testing: reset all state
       def reset!
-        @connections = Concurrent::Hash.new
         @subscriptions = Concurrent::Hash.new { |h, k| h[k] = Concurrent::Hash.new }
+        ConnectionRegistry.reset!
       end
 
-      # Graceful shutdown: close all connections
-      # Called on SIGTERM to allow clean dyno restarts
-      # Must complete within Heroku's 30s window, so we use a timeout
+      # Graceful shutdown: close all connections (delegates to ConnectionRegistry)
       def shutdown(timeout: 25)
-        count = connections.size
-        return if count.zero?
-
-        Config.logger.info("[NostrRelay] Shutting down #{count} connections...")
-        start_time = Time.now
-        closed = 0
-
-        # Take a snapshot of connection IDs to avoid iteration issues
-        connection_ids = connections.keys
-
-        connection_ids.each_with_index do |conn_id, index|
-          # Check timeout (O(1) instead of O(n) with index lookup)
-          elapsed = Time.now - start_time
-          if elapsed > timeout
-            remaining = connection_ids.size - index
-            Config.logger.warn("[NostrRelay] Shutdown timeout after #{elapsed.round(1)}s, #{remaining} connections not closed gracefully")
-            break
-          end
-
-          connection = connections[conn_id]
-          next unless connection
-
-          begin
-            connection.close(1000, "Server shutting down")
-            closed += 1
-          rescue StandardError => e
-            Config.logger.error("[NostrRelay] Error closing connection #{conn_id}: #{e.message}")
-          end
-        end
-
-        reset!
-        elapsed = (Time.now - start_time).round(2)
-        Config.logger.info("[NostrRelay] Shutdown complete: #{closed}/#{count} connections closed in #{elapsed}s")
+        @subscriptions = Concurrent::Hash.new { |h, k| h[k] = Concurrent::Hash.new }
+        ConnectionRegistry.shutdown(timeout:)
       end
 
-      # Number of active connections (for monitoring)
+      # Number of active connections (delegates to ConnectionRegistry)
       def connection_count
-        connections.size
+        ConnectionRegistry.connection_count
       end
 
       private
@@ -141,7 +112,7 @@ module NostrRelay
         dead_connections = []
 
         subscriptions.each do |conn_id, subs|
-          connection = connections[conn_id]
+          connection = ConnectionRegistry.get(conn_id)
           next unless connection
 
           subs.each do |sub_id, subscription|
@@ -164,7 +135,7 @@ module NostrRelay
         dead_connections = []
 
         subscriptions.each do |conn_id, subs|
-          connection = connections[conn_id]
+          connection = ConnectionRegistry.get(conn_id)
           next unless connection
 
           subs.each do |sub_id, subscription|
@@ -194,51 +165,7 @@ module NostrRelay
 
       # Match event against subscription filters with NIP-50 search support
       def matches_with_search?(subscription, event_hash)
-        data = event_hash.transform_keys(&:to_s)
-
-        subscription.filters.any? do |filter|
-          filter = filter.transform_keys(&:to_s)
-
-          # Standard filter checks
-          next false if filter["kinds"] && !filter["kinds"].include?(data["kind"])
-          next false if filter["authors"] && !filter["authors"].include?(data["pubkey"])
-          next false if filter["ids"] && !filter["ids"].include?(data["id"])
-          next false if filter["since"] && data["created_at"] < filter["since"]
-          next false if filter["until"] && data["created_at"] > filter["until"]
-
-          # Tag filters
-          tag_match = filter.all? { |key, values|
-            next true unless key.match?(/\A#[a-zA-Z]\z/)
-            tag_name = key[1]
-            tag_matches_data?(tag_name, Array(values), data["tags"])
-          }
-          next false unless tag_match
-
-          # NIP-50: Search filter
-          search = filter["search"]
-          next false if search.present? && !content_matches_search?(data["content"], search)
-
-          true
-        end
-      end
-
-      # Check if event tags match filter tag values
-      def tag_matches_data?(tag_name, filter_values, tags)
-        return true if filter_values.empty?
-        return false unless tags.is_a?(Array)
-
-        event_vals = tags
-          .select { |t| t.is_a?(Array) && t[0] == tag_name && t.size >= 2 }
-          .map { |t| t[1] }
-
-        (event_vals & filter_values).any?
-      end
-
-      # NIP-50: Simple term matching for search filter
-      def content_matches_search?(content, query)
-        return true if query.blank?
-        terms = query.downcase.split.reject { |t| t.start_with?("-") || t.include?(":") }
-        terms.all? { |term| content.to_s.downcase.include?(term) }
+        FilterMatcher.matches?(subscription.filters, event_hash)
       end
 
       # Returns true on success, false if connection is dead
