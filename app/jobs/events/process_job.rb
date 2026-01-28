@@ -3,6 +3,8 @@
 module Events
   # Processes events received from upstream relays
   class ProcessJob < ApplicationJob
+    include JobLoggable
+
     queue_as :events
 
     # Discard if event already exists (duplicate)
@@ -23,15 +25,15 @@ module Events
       if result.success?
         values = result.value!
         if values[:skipped]
-          Rails.logger.info "[Events::ProcessJob] Skipped #{event_data[:id][0..7]}... (#{values[:reason]})"
+          logger.info "Skipped event", event_id: event_data[:id][0..7], reason: values[:reason]
         else
-          Rails.logger.info "[Events::ProcessJob] Saved event #{values[:event_id][0..7]}... from #{source_relay}"
+          logger.info "Saved event", event_id: values[:event_id][0..7], source_relay:
         end
       else
-        Rails.logger.error "[Events::ProcessJob] Failed to save event: #{result.failure}"
+        logger.error "Failed to save event", failure: result.failure
       end
     rescue JSON::ParserError => e
-      Rails.logger.error "[Events::ProcessJob] Invalid JSON: #{e.message}"
+      logger.error "Invalid JSON", error: e.message
     end
   end
 end

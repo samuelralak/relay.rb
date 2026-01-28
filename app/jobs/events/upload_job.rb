@@ -3,6 +3,8 @@
 module Events
   # Uploads local events to a remote relay
   class UploadJob < ApplicationJob
+    include JobLoggable
+
     queue_as :uploads
 
     # @param relay_url [String] URL of the relay to upload to
@@ -15,15 +17,18 @@ module Events
       values = result.value!
 
       if values[:reason] == "no_events"
-        Rails.logger.info "[Events::UploadJob] No events to upload to #{relay_url}"
+        logger.info("No events to upload", relay_url:)
       else
-        Rails.logger.info "[Events::UploadJob] Upload complete to #{relay_url}: " \
-                          "#{values[:published]} published, #{values[:duplicates]} duplicates, #{values[:failed]} failed"
+        logger.info "Upload complete",
+          relay_url:,
+          published: values[:published],
+          duplicates: values[:duplicates],
+          failed: values[:failed]
       end
     rescue RelaySync::ConnectionError => e
-      Rails.logger.error "[Events::UploadJob] #{e.message}"
+      logger.error "Connection error", error: e.message
     rescue StandardError => e
-      Rails.logger.error "[Events::UploadJob] Error: #{e.message}"
+      logger.error "Error", error: e.message
       raise
     end
   end

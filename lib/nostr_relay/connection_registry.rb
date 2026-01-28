@@ -7,6 +7,12 @@ module NostrRelay
   # Extracted from Subscriptions to separate connection management from subscription logic.
   module ConnectionRegistry
     class << self
+      def tagged_logger
+        @tagged_logger_mutex ||= Mutex.new
+        @tagged_logger_mutex.synchronize do
+          @tagged_logger ||= AppLogger["NostrRelay::ConnectionRegistry"]
+        end
+      end
       def connections
         @connections ||= Concurrent::Hash.new
       end
@@ -50,7 +56,7 @@ module NostrRelay
         count = connections.size
         return if count.zero?
 
-        Config.logger.info("[NostrRelay] Shutting down #{count} connections...")
+        tagged_logger.info("Shutting down connections", count:)
         start_time = Time.now
         closed = 0
 
@@ -62,7 +68,7 @@ module NostrRelay
           elapsed = Time.now - start_time
           if elapsed > timeout
             remaining = connection_ids.size - index
-            Config.logger.warn("[NostrRelay] Shutdown timeout after #{elapsed.round(1)}s, #{remaining} connections not closed gracefully")
+            tagged_logger.warn("Shutdown timeout", elapsed_seconds: elapsed.round(1), remaining:)
             break
           end
 
@@ -73,13 +79,13 @@ module NostrRelay
             connection.close(1000, "Server shutting down")
             closed += 1
           rescue StandardError => e
-            Config.logger.error("[NostrRelay] Error closing connection #{conn_id}: #{e.message}")
+            tagged_logger.error "Error closing connection", id: conn_id, error: e.message
           end
         end
 
         reset!
         elapsed = (Time.now - start_time).round(2)
-        Config.logger.info("[NostrRelay] Shutdown complete: #{closed}/#{count} connections closed in #{elapsed}s")
+        tagged_logger.info "Shutdown complete", closed:, total: count, elapsed_seconds: elapsed
       end
     end
   end

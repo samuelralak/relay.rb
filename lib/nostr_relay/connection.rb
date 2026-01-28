@@ -7,6 +7,15 @@ module NostrRelay
   # Handles a single WebSocket connection lifecycle.
   # Protocol-level code lives in lib/nostr_relay/, business logic in app/services/.
   class Connection
+    class << self
+      def tagged_logger
+        @tagged_logger_mutex ||= Mutex.new
+        @tagged_logger_mutex.synchronize do
+          @tagged_logger ||= AppLogger["NostrRelay::Connection"]
+        end
+      end
+    end
+
     attr_reader :id
 
     def initialize(websocket)
@@ -17,11 +26,11 @@ module NostrRelay
 
     def on_open
       Subscriptions.register(self)
-      Config.logger.info("[NostrRelay] Connection opened: #{@id}")
+      tagged_logger.info "Connection opened", id: @id
     end
 
     def on_message(data)
-      Config.logger.debug("[NostrRelay] Received from #{@id}: #{data[0..100]}...")
+      tagged_logger.debug "Received message", id: @id, preview: data[0..100]
 
       # Enforce message size limit before processing
       max_length = Config.max_message_length
@@ -35,12 +44,12 @@ module NostrRelay
 
     def on_close(code, reason)
       Subscriptions.unregister(@id)
-      Config.logger.info("[NostrRelay] Connection closed: #{@id} (code=#{code}, reason=#{reason})")
+      tagged_logger.info "Connection closed", id: @id, code:, reason:
     end
 
     def on_error(event)
       message = event.respond_to?(:message) ? event.message : event.to_s
-      Config.logger.error("[NostrRelay] WebSocket error on #{@id}: #{message}")
+      tagged_logger.error "WebSocket error", id: @id, error: message
       # Connection will be cleaned up by on_close which follows on_error
     end
 
@@ -51,7 +60,7 @@ module NostrRelay
         @ws.close(code, reason)
       end
     rescue StandardError => e
-      Config.logger.error("[NostrRelay] Error closing connection #{@id}: #{e.message}")
+      tagged_logger.error "Error closing connection", id: @id, error: e.message
     end
 
     # Outbound message methods per NIP-01
@@ -77,17 +86,21 @@ module NostrRelay
 
     private
 
+    def tagged_logger
+      @tagged_logger ||= self.class.tagged_logger
+    end
+
     # Thread-safe message sending
     # faye-websocket buffers writes, mutex prevents concurrent corruption
     def send_message(payload)
       json = payload.to_json
-      Config.logger.debug("[NostrRelay] Sending to #{@id}: #{json[0..100]}...")
+      tagged_logger.debug "Sending message", id: @id, preview: json[0..100]
 
       @send_mutex.synchronize do
         @ws.send(json)
       end
     rescue StandardError => e
-      Config.logger.error("[NostrRelay] Failed to send message to #{@id}: #{e.class}: #{e.message}")
+      tagged_logger.error "Failed to send message", id: @id, error: "#{e.class}: #{e.message}"
     end
   end
 end

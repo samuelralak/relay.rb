@@ -23,14 +23,14 @@ module SyncStates
         # Resume from cursor minus overlap to ensure no gaps
         resumed_since = last_download_timestamp.to_i - overlap
         filter[:since] = resumed_since
-        Rails.logger.info "[SyncState] Resuming from #{Time.at(resumed_since)} (cursor - #{overlap}s overlap)"
+        AppLogger[:SyncState].info "Resuming", from: Time.at(resumed_since), overlap_seconds: overlap
       elsif fallback_since
         # First sync - use fallback
         filter[:since] = fallback_since
-        Rails.logger.info "[SyncState] Starting fresh from #{Time.at(fallback_since)}"
+        AppLogger[:SyncState].info "Starting fresh", from: Time.at(fallback_since)
       else
         # No resume point - this will sync all events (potentially expensive)
-        Rails.logger.warn "[SyncState] No resume point for #{relay_url} - syncing without time filter"
+        AppLogger[:SyncState].warn "No resume point - syncing without time filter", relay_url:
       end
 
       filter

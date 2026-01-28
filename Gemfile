@@ -63,6 +63,7 @@ gem "dry-struct", "~> 1.6"
 gem "dry-initializer-rails", "~> 3.1"
 gem "dry-monads", "~> 1.6"
 gem "dry-validation", "~> 1.10"
+gem "dry-logger", "~> 1.0"
 
 # NIP-01: Nostr protocol and Schnorr signature verification (BIP-340)
 gem "nostr", "~> 0.7"

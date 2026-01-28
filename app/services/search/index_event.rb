@@ -2,6 +2,8 @@
 
 module Search
   class IndexEvent < BaseService
+    include Loggable
+
     option :event, type: Types::Instance(Event)
 
     def call
@@ -16,7 +18,7 @@ module Search
       Success(event_id: event.event_id)
     rescue StandardError => e
       # Log but don't fail - search indexing is non-critical
-      Rails.logger.warn "[Search::IndexEvent] Failed: #{e.message}"
+      logger.warn "Indexing failed", error: e.message
       Success(skipped: true, reason: "indexing_error")
     end
 

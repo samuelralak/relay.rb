@@ -4,6 +4,8 @@ module Sync
   # Polls a relay for events using REQ/EOSE pattern
   # Supports both realtime polling and chunked backfill modes
   class PollingJob < ApplicationJob
+    include JobLoggable
+
     queue_as :sync
 
     retry_on RelaySync::ConnectionError, wait: :polynomially_longer, attempts: 5
@@ -33,7 +35,7 @@ module Sync
       # Skip if already syncing (unless continuation)
       unless @continuation
         if @sync_state.syncing? && !@sync_state.stale?(threshold: stale_threshold)
-          Rails.logger.info "[Sync::PollingJob] Skipping #{relay_url} - already syncing"
+          logger.info("Skipping - already syncing", relay_url:)
           @status_handled = true  # Don't reset - another job owns this status
           return
         end
@@ -49,7 +51,7 @@ module Sync
         perform_realtime_poll
       end
     rescue StandardError => e
-      Rails.logger.error "[Sync::PollingJob] Error polling #{relay_url}: #{e.message}"
+      logger.error "Error polling", relay_url:, error: e.message
       @sync_state&.mark_error!(e.message)
       @status_handled = true
       raise
@@ -57,7 +59,7 @@ module Sync
       # Safety net: if status is still 'syncing' and wasn't handled, reset to idle
       # This prevents jobs from leaving status stuck if terminated unexpectedly
       if @sync_state&.syncing? && !@status_handled
-        Rails.logger.warn "[Sync::PollingJob] Ensure block resetting stuck syncing status for #{@relay_url}"
+        logger.warn "Ensure block resetting stuck syncing status", relay_url: @relay_url
         @sync_state.reset_to_idle!
       end
     end
@@ -75,7 +77,7 @@ module Sync
 
       # Check if already complete
       if @sync_state.polling_backfill_complete?
-        Rails.logger.info "[Sync::PollingJob] Backfill complete for #{@relay_url}"
+        logger.info "Backfill complete", relay_url: @relay_url
         @sync_state.mark_completed! unless @sync_state.completed?
         @status_handled = true
         return
@@ -84,7 +86,7 @@ module Sync
       # Get next chunk
       @current_chunk = @sync_state.next_polling_backfill_chunk(chunk_hours: @chunk_hours)
       if @current_chunk.nil?
-        Rails.logger.info "[Sync::PollingJob] No more chunks for #{@relay_url}"
+        logger.info "No more chunks", relay_url: @relay_url
         @sync_state.mark_completed!
         @status_handled = true
         return
@@ -93,8 +95,10 @@ module Sync
       # Merge chunk filter with base filter
       effective_filter = @filter.merge(@current_chunk)
 
-      Rails.logger.info "[Sync::PollingJob] Backfill chunk: #{Time.at(@current_chunk[:since])} to #{Time.at(@current_chunk[:until])}"
-      Rails.logger.info "[Sync::PollingJob] Progress: #{@sync_state.polling_backfill_progress_percent}%"
+      logger.info "Processing backfill chunk",
+        since: Time.at(@current_chunk[:since]),
+        until: Time.at(@current_chunk[:until])
+      logger.info "Progress", percent: @sync_state.polling_backfill_progress_percent
 
       ensure_connection!
       @sync_state.mark_syncing!
@@ -105,15 +109,15 @@ module Sync
       # Mark chunk completed
       @sync_state.mark_polling_chunk_completed!(chunk_end: Time.at(@current_chunk[:until]))
 
-      Rails.logger.info "[Sync::PollingJob] Chunk complete: #{events_received} events"
+      logger.info("Chunk complete", events_received:)
 
       # Schedule next chunk or mark completed
       if @sync_state.polling_backfill_complete?
-        Rails.logger.info "[Sync::PollingJob] Backfill FULLY COMPLETE for #{@relay_url}"
+        logger.info "Backfill FULLY COMPLETE", relay_url: @relay_url
         @sync_state.mark_completed!
         @status_handled = true
       else
-        Rails.logger.info "[Sync::PollingJob] Scheduling next chunk"
+        logger.info "Scheduling next chunk"
         self.class.perform_later(
           relay_url: @relay_url,
           filter: @filter,
@@ -133,8 +137,8 @@ module Sync
         fallback_since: @filter[:since]
       )
 
-      Rails.logger.info "[Sync::PollingJob] Polling #{@relay_url} (mode: #{@mode})"
-      Rails.logger.info "[Sync::PollingJob] Filter: #{effective_filter}"
+      logger.info "Polling", relay_url: @relay_url, mode: @mode
+      logger.debug "Filter", filter: effective_filter
 
       ensure_connection!
       @sync_state.mark_syncing!
@@ -145,7 +149,7 @@ module Sync
       # The sync will be picked up again by the next scheduled orchestration
       @sync_state.reset_to_idle!
       @status_handled = true
-      Rails.logger.info "[Sync::PollingJob] Finished polling #{@relay_url}: #{events_received} events received"
+      logger.info "Finished polling", relay_url: @relay_url, events_received:
     end
 
     def find_or_create_sync_state

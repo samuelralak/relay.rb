@@ -118,6 +118,8 @@ GEM
     dry-initializer-rails (3.1.1)
       dry-initializer (>= 2.4, < 4)
       rails (> 3.0)
+    dry-logger (1.2.1)
+      logger
     dry-logic (1.6.0)
       bigdecimal
       concurrent-ruby (~> 1.0)
@@ -431,6 +433,7 @@ DEPENDENCIES
   dotenv-rails (~> 3.2)
   dry-initializer (~> 3.1)
   dry-initializer-rails (~> 3.1)
+  dry-logger (~> 1.0)
   dry-monads (~> 1.6)
   dry-struct (~> 1.6)
   dry-types (~> 1.7)
@@ -490,6 +493,7 @@ CHECKSUMS
   dry-inflector (1.3.1) sha256=7fb0c2bb04f67638f25c52e7ba39ab435d922a3a5c3cd196120f63accb682dcc
   dry-initializer (3.2.0) sha256=37d59798f912dc0a1efe14a4db4a9306989007b302dcd5f25d0a2a20c166c4e3
   dry-initializer-rails (3.1.1) sha256=1f8d3fd61a055572f30fc3b7bbd3372e0af733fd5796b4ffe29c48c3fb19059e
+  dry-logger (1.2.1) sha256=4087bb8dfcd7cf4a1e8f53854589c09904e8341b52fe05c6a1d3ec37d7f03e72
   dry-logic (1.6.0) sha256=da6fedbc0f90fc41f9b0cc7e6f05f5d529d1efaef6c8dcc8e0733f685745cea2
   dry-monads (1.9.0) sha256=9348a67b5c862c7a876342dbd94737fdf3fb3c17978382cf6801a85b27215816
   dry-schema (1.15.0) sha256=0f2a34adba4206bd6d46ec1b6b7691b402e198eecaff1d8349a7d48a77d82cd2

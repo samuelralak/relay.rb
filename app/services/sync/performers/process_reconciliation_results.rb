@@ -5,6 +5,8 @@ module Sync
     # Processes Negentropy reconciliation results by downloading/uploading events.
     # Downloads events we need from the relay, and schedules uploads for events we have.
     class ProcessReconciliationResults < BaseService
+      include Loggable
+
       option :connection, type: Types::Any
       option :relay_url, type: Types::RelayUrl
       option :have_ids, type: Types::Array.of(Types::String)
@@ -25,7 +27,7 @@ module Sync
       private
 
       def download_needed_events
-        Rails.logger.info "[Sync::Performers::ProcessReconciliationResults] Fetching #{need_ids.size} missing events"
+        logger.info "Fetching missing events", count: need_ids.size
 
         result = Actions::FetchEvents.call(
           connection:,
@@ -34,7 +36,7 @@ module Sync
           sync_state:
         )
 
-        Rails.logger.info "[Sync::Performers::ProcessReconciliationResults] FetchEvents result: #{result.inspect}"
+        logger.info "FetchEvents result", success: result.success?, value: result.success? ? result.value! : result.failure
         result.success? ? result.value! : { fetched: 0 }
       end
 

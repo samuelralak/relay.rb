@@ -4,6 +4,8 @@ module Sync
   # Performs Negentropy (NIP-77) sync with a remote relay
   # Supports progressive chunked backfill to avoid "too many results" errors
   class NegentropyJob < ApplicationJob
+    include JobLoggable
+
     queue_as :sync
 
     # Retry on connection errors with exponential backoff
@@ -28,7 +30,7 @@ module Sync
       # Skip if already syncing and not stale (unless this is a continuation)
       unless continuation
         if @sync_state.syncing? && !@sync_state.stale?(threshold: stale_threshold)
-          Rails.logger.info "[Sync::NegentropyJob] Skipping #{relay_url} - already syncing"
+          logger.info("Skipping - already syncing", relay_url:)
           @status_handled = true  # Don't reset - another job owns this status
           return
         end
@@ -36,7 +38,7 @@ module Sync
 
       # Check for stale sync (interrupted previous run)
       if @sync_state.stale?(threshold: stale_threshold)
-        Rails.logger.warn "[Sync::NegentropyJob] Resuming stale sync for #{relay_url}"
+        logger.warn("Resuming stale sync", relay_url:)
         @sync_state.reset_to_idle!
       end
 
@@ -45,7 +47,7 @@ module Sync
 
       # Check if backfill is already complete
       if @sync_state.backfill_complete?
-        Rails.logger.info "[Sync::NegentropyJob] Backfill complete for #{relay_url}"
+        logger.info("Backfill complete", relay_url:)
         # Ensure status reflects completion (might be stale "syncing" from crashed previous job)
         @sync_state.mark_completed! unless @sync_state.completed?
         @status_handled = true
@@ -55,16 +57,18 @@ module Sync
       # Get the next chunk to sync (saved as instance var for error handler access)
       @current_chunk = @sync_state.next_backfill_chunk(chunk_hours: @chunk_hours)
       if @current_chunk.nil?
-        Rails.logger.info "[Sync::NegentropyJob] No more chunks to sync for #{relay_url}"
+        logger.info("No more chunks to sync", relay_url:)
         @sync_state.mark_completed!
         @status_handled = true
         return
       end
       effective_filter = @base_filter.merge(@current_chunk)
 
-      Rails.logger.info "[Sync::NegentropyJob] Starting sync with #{relay_url}"
-      Rails.logger.info "[Sync::NegentropyJob] Chunk: #{Time.at(@current_chunk[:since])} to #{Time.at(@current_chunk[:until])}"
-      Rails.logger.info "[Sync::NegentropyJob] Progress: #{@sync_state.backfill_progress_percent}% complete"
+      logger.info("Starting sync", relay_url:)
+      logger.info "Processing chunk",
+        since: Time.at(@current_chunk[:since]),
+        until: Time.at(@current_chunk[:until])
+      logger.info "Progress", percent: @sync_state.backfill_progress_percent
 
       ensure_connection!(relay_url)
 
@@ -84,19 +88,21 @@ module Sync
       # Mark this chunk as completed
       @sync_state.mark_backfill_chunk_completed!(chunk_start: Time.at(@current_chunk[:since]))
 
-      Rails.logger.info "[Sync::NegentropyJob] Chunk complete for #{relay_url}. " \
-                        "Have: #{result.value![:have_ids].size}, Need: #{result.value![:need_ids].size}"
-      Rails.logger.info "[Sync::NegentropyJob] Backfill progress: #{@sync_state.backfill_progress_percent}%"
+      logger.info "Chunk complete",
+        relay_url:,
+        have_ids: result.value![:have_ids].size,
+        need_ids: result.value![:need_ids].size
+      logger.info "Backfill progress", percent: @sync_state.backfill_progress_percent
 
       # Schedule next chunk immediately if backfill not complete
       if @sync_state.backfill_complete?
-        Rails.logger.info "[Sync::NegentropyJob] Backfill FULLY COMPLETE for #{relay_url}"
+        logger.info("Backfill FULLY COMPLETE", relay_url:)
         @sync_state.mark_completed!
         @status_handled = true
       else
         # Keep status as syncing - the continuation job will bypass the syncing check
         # This provides accurate status during multi-chunk backfill
-        Rails.logger.info "[Sync::NegentropyJob] Scheduling next chunk for #{relay_url}"
+        logger.info("Scheduling next chunk", relay_url:)
         self.class.perform_later(
           relay_url:,
           filter: @base_filter,
@@ -108,14 +114,14 @@ module Sync
         @status_handled = true  # Status intentionally left as syncing for continuation
       end
     rescue RelaySync::SyncTimeoutError => e
-      Rails.logger.warn "[Sync::NegentropyJob] Timeout for #{relay_url}: #{e.message}"
+      logger.warn "Timeout", relay_url:, error: e.message
       @sync_state&.mark_error!(e.message)
       @status_handled = true
       # Don't retry immediately - let the stale recovery job handle it
       # This avoids hammering a slow relay
     rescue RelaySync::NegentropyError => e
-      Rails.logger.warn "[Sync::NegentropyJob] Negentropy error for #{relay_url}: #{e.message}"
-      Rails.logger.info "[Sync::NegentropyJob] Falling back to polling sync for current chunk"
+      logger.warn "Negentropy error", relay_url:, error: e.message
+      logger.info "Falling back to polling sync for current chunk"
       @sync_state&.reset_to_idle!
       @status_handled = true
 
@@ -131,12 +137,12 @@ module Sync
         mode: RelaySync::SyncMode::BACKFILL
       )
     rescue RelaySync::ConnectionError => e
-      Rails.logger.error "[Sync::NegentropyJob] Connection error: #{e.message}"
+      logger.error "Connection error", error: e.message
       @sync_state&.mark_error!(e.message)
       @status_handled = true
       raise # Let retry mechanism handle it
     rescue StandardError => e
-      Rails.logger.error "[Sync::NegentropyJob] Error: #{e.message}"
+      logger.error "Error", error: e.message
       @sync_state&.mark_error!(e.message)
       @status_handled = true
       raise
@@ -144,7 +150,7 @@ module Sync
       # Safety net: if status is still 'syncing' and wasn't handled, reset to idle
       # This prevents jobs from leaving status stuck if terminated unexpectedly
       if @sync_state&.syncing? && !@status_handled
-        Rails.logger.warn "[Sync::NegentropyJob] Ensure block resetting stuck syncing status for #{@relay_url}"
+        logger.warn "Ensure block resetting stuck syncing status", relay_url: @relay_url
         @sync_state.reset_to_idle!
       end
     end

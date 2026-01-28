@@ -5,6 +5,8 @@ module Sync
     # Ensures a connection to a relay is established
     # Handles reconnection, new connection creation, and waiting for connection
     class EnsureConnection < BaseService
+      include Loggable
+
       option :relay_url, type: Types::RelayUrl
       option :timeout, type: Types::Integer, default: -> { 30 }
 
@@ -12,13 +14,13 @@ module Sync
         conn = RelaySync.manager.connection_for(relay_url)
 
         if conn&.connected?
-          Rails.logger.debug "[EnsureConnection] Reusing existing connection to #{relay_url}"
+          logger.debug("Reusing existing connection", relay_url:)
           return Success(connection: conn)
         elsif conn && !conn.connected?
-          Rails.logger.info "[EnsureConnection] Reconnecting to #{relay_url} (state: #{conn.state})"
+          logger.info "Reconnecting", relay_url:, state: conn.state
           conn.connect
         else
-          Rails.logger.info "[EnsureConnection] Creating new connection to #{relay_url}"
+          logger.info("Creating new connection", relay_url:)
           RelaySync.manager.add_connection(relay_url)
         end
 
@@ -34,12 +36,12 @@ module Sync
         loop do
           conn = RelaySync.manager.connection_for(relay_url)
           if conn&.connected?
-            Rails.logger.debug "[EnsureConnection] Connected to #{relay_url}"
+            logger.debug("Connected", relay_url:)
             return
           end
 
           if Time.now > deadline
-            Rails.logger.error "[EnsureConnection] Timeout - state: #{conn&.state || 'no connection'}"
+            logger.error "Timeout", state: conn&.state || "no connection"
             raise RelaySync::ConnectionError, "Timeout connecting to #{relay_url}"
           end
 

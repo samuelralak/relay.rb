@@ -30,7 +30,6 @@ Rails.application.config.relay_info = {
 # Configure NostrRelay library after Rails loads
 Rails.application.config.after_initialize do
   NostrRelay::Config.relay_info = Rails.application.config.relay_info
-  NostrRelay::Config.logger = Rails.logger
 
   NostrRelay::Config.configure do |config|
     # Adapters - application provides implementations matching expected API
@@ -44,8 +43,8 @@ Rails.application.config.after_initialize do
 
   # Log Redis pub/sub status
   if defined?(NostrRelay::RedisPubsub) && NostrRelay::RedisPubsub.enabled?
-    Rails.logger.info("[NostrRelay] Redis pub/sub enabled for cross-worker broadcasts")
+    AppLogger[:NostrRelay].info "Redis pub/sub enabled for cross-worker broadcasts"
   else
-    Rails.logger.info("[NostrRelay] Redis pub/sub disabled (REDIS_URL not set)")
+    AppLogger[:NostrRelay].info "Redis pub/sub disabled (REDIS_URL not set)"
   end
 end

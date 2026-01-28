@@ -15,21 +15,21 @@ module RelaySync
       type = message[0]
 
       case type
-      when "EVENT"
+      when Messages::Inbound::EVENT
         parse_event(message)
-      when "EOSE"
+      when Messages::Inbound::EOSE
         parse_eose(message)
-      when "OK"
+      when Messages::Inbound::OK
         parse_ok(message)
-      when "NOTICE"
+      when Messages::Inbound::NOTICE
         parse_notice(message)
       when Negentropy::MessageType::NEG_MSG
         parse_neg_msg(message)
       when Negentropy::MessageType::NEG_ERR
         parse_neg_err(message)
-      when "CLOSED"
+      when Messages::Inbound::CLOSED
         parse_closed(message)
-      when "AUTH"
+      when Messages::Inbound::AUTH
         parse_auth(message)
       else
         { type: :unknown, raw: message }
@@ -43,21 +43,21 @@ module RelaySync
     # @param filters [Array<Hash>] Nostr filter objects
     # @return [Array] REQ message array
     def build_req(subscription_id, *filters)
-      [ "REQ", subscription_id, *filters ]
+      [ Messages::Outbound::REQ, subscription_id, *filters ]
     end
 
     # Build a CLOSE message for unsubscribing
     # @param subscription_id [String] subscription ID
     # @return [Array] CLOSE message array
     def build_close(subscription_id)
-      [ "CLOSE", subscription_id ]
+      [ Messages::Outbound::CLOSE, subscription_id ]
     end
 
     # Build an EVENT message for publishing
     # @param event [Hash] Nostr event object
     # @return [Array] EVENT message array
     def build_event(event)
-      [ "EVENT", event ]
+      [ Messages::Outbound::EVENT, event ]
     end
 
     # Build a NEG-OPEN message for Negentropy sync

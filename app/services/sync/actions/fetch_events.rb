@@ -5,6 +5,7 @@ module Sync
     # Fetches events from a relay by their IDs in batches.
     # Queues Events::ProcessJob for each received event.
     class FetchEvents < BaseService
+      include Loggable
       include TimeoutWaitable
 
       option :connection, type: Types::Any
@@ -66,7 +67,7 @@ module Sync
           ) { tracker.complete_unlocked? }
 
           unless completed
-            Rails.logger.warn "[Sync::Actions::FetchEvents] EOSE timeout for batch fetch #{sub_id}"
+            logger.warn "EOSE timeout for batch fetch", subscription_id: sub_id
           end
 
           final_batch_count = batch_mutex.synchronize { batch_fetched }

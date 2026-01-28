@@ -6,6 +6,8 @@ require "nostr"
 module Events
   module Actions
     class VerifySignature < BaseService
+      include Loggable
+
       option :event_data, type: Types::Hash
 
       def call
@@ -53,7 +55,7 @@ module Events
           Nostr::Signature.new(@data["sig"])
         )
       rescue StandardError => e
-        Rails.logger.error("Signature verification error: #{e.message}")
+        logger.error "Signature verification error", error: e.message
         false
       end
     end

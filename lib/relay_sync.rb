@@ -4,6 +4,7 @@ require_relative "relay_sync/version"
 require_relative "relay_sync/errors"
 require_relative "relay_sync/types"
 require_relative "relay_sync/configuration"
+require_relative "relay_sync/messages"
 require_relative "relay_sync/handler_registry"
 require_relative "relay_sync/message_handler"
 require_relative "relay_sync/reactor"
@@ -13,10 +14,11 @@ require_relative "relay_sync/manager"
 
 module RelaySync
   class << self
-    attr_writer :logger
-
-    def logger
-      @logger ||= Logger.new($stdout, level: Logger::INFO)
+    def tagged_logger
+      @tagged_logger_mutex ||= Mutex.new
+      @tagged_logger_mutex.synchronize do
+        @tagged_logger ||= AppLogger["RelaySync"]
+      end
     end
 
     def manager
@@ -41,26 +43,25 @@ module RelaySync
 
     # Start the sync manager and connect to all enabled relays
     def start
-      logger.info "[RelaySync] Starting sync manager..."
+      tagged_logger.info "Starting sync manager"
 
       max_connections = configuration.sync_settings.max_concurrent_connections
       relays_to_connect = configuration.enabled_relays.take(max_connections)
 
       if relays_to_connect.size < configuration.enabled_relays.size
-        logger.warn "[RelaySync] Limited to #{max_connections} connections " \
-                    "(#{configuration.enabled_relays.size} relays configured)"
+        tagged_logger.warn "Connection limit reached", max: max_connections, configured: configuration.enabled_relays.size
       end
 
       relays_to_connect.each do |relay_config|
         manager.add_connection(relay_config.url)
       end
 
-      logger.info "[RelaySync] Connecting to #{relays_to_connect.size} relay(s)"
+      tagged_logger.info "Connecting to relays", count: relays_to_connect.size
     end
 
     # Stop all connections
     def stop
-      logger.info "[RelaySync] Stopping sync manager..."
+      tagged_logger.info "Stopping sync manager"
       manager.stop
       reactor.stop
     end

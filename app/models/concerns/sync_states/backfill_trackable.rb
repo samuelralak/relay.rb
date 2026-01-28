@@ -76,8 +76,8 @@ module SyncStates
            !polling_backfill_complete? &&
            backfill_until > Time.current - 2.hours &&
            backfill_target < Time.current - 1.week
-          Rails.logger.info "[BackfillTrackable] Reinitializing #{relay_url} for forward sync " \
-                            "(was: #{backfill_until}, resetting to: #{backfill_target})"
+          AppLogger[:BackfillTrackable].info "Reinitializing for forward sync",
+            relay_url:, was: backfill_until, reset_to: backfill_target
           update!(backfill_until: backfill_target)
         end
         return

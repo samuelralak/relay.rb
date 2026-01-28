@@ -2,6 +2,8 @@
 
 module Search
   class BulkIndexEvents < BaseService
+    include Loggable
+
     option :batch_size, type: Types::Integer, default: -> { 1000 }
     option :scope, type: Types::Any, default: -> { Event.all }
 
@@ -24,16 +26,16 @@ module Search
         end
 
         indexed += batch.size
-        Rails.logger.info "[Search::BulkIndexEvents] Indexed #{indexed} events"
+        logger.info "Indexed events", count: indexed
       end
 
       if errors.any?
-        Rails.logger.warn "[Search::BulkIndexEvents] #{errors.size} errors: #{errors.first(5).join(', ')}"
+        logger.warn "Bulk index errors", error_count: errors.size, sample: errors.first(5).join(", ")
       end
 
       Success(indexed:, errors: errors.size)
     rescue StandardError => e
-      Rails.logger.error "[Search::BulkIndexEvents] Failed: #{e.message}"
+      logger.error "Failed", error: e.message
       Failure(:bulk_index_error)
     end
 

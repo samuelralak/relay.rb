@@ -4,6 +4,13 @@ module NostrRelay
   module Handlers
     # Handles incoming REQ messages (subscriptions).
     module Req
+      def self.tagged_logger
+        @tagged_logger_mutex ||= Mutex.new
+        @tagged_logger_mutex.synchronize do
+          @tagged_logger ||= AppLogger["NostrRelay::Handlers::Req"]
+        end
+      end
+
       module_function
 
       def call(connection:, sub_id:, filters:)
@@ -33,7 +40,7 @@ module NostrRelay
 
         connection.send_eose(sub_id)
       rescue StandardError => e
-        Config.logger.error("[NostrRelay] REQ handler error: #{e.class}: #{e.message}\n#{e.backtrace.first(5).join("\n")}")
+        Req.tagged_logger.error "REQ handler error", error: "#{e.class}: #{e.message}", backtrace: e.backtrace.first(5)
         connection.send_closed(sub_id, "#{Messages::Prefix::ERROR} internal error")
       end
 

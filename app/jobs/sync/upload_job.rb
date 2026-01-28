@@ -4,6 +4,8 @@ module Sync
   # Uploads local events to a remote relay
   # Uses SyncState to track upload progress and prevent duplicate uploads
   class UploadJob < ApplicationJob
+    include JobLoggable
+
     queue_as :uploads
 
     retry_on RelaySync::ConnectionError, wait: :polynomially_longer, attempts: 3
@@ -15,7 +17,7 @@ module Sync
 
       # Skip if already syncing and not stale
       if @sync_state.syncing? && !@sync_state.stale?(threshold: stale_threshold)
-        Rails.logger.info "[Sync::UploadJob] Skipping #{relay_url} - already uploading"
+        logger.info("Skipping - already uploading", relay_url:)
         return
       end
 
@@ -27,11 +29,11 @@ module Sync
                                 .limit(sync_settings.upload_batch_size)
 
       if events_scope.empty?
-        Rails.logger.info "[Sync::UploadJob] No events to upload to #{relay_url}"
+        logger.info("No events to upload", relay_url:)
         return
       end
 
-      Rails.logger.info "[Sync::UploadJob] Uploading #{events_scope.count} events to #{relay_url}"
+      logger.info "Uploading events", relay_url:, count: events_scope.count
 
       @sync_state.mark_syncing!
 
@@ -53,10 +55,13 @@ module Sync
 
       @sync_state.mark_completed!
 
-      Rails.logger.info "[Sync::UploadJob] Completed #{relay_url}: " \
-                        "#{values[:published]} published, #{values[:duplicates]} duplicates, #{values[:failed]} failed"
+      logger.info "Upload completed",
+        relay_url:,
+        published: values[:published],
+        duplicates: values[:duplicates],
+        failed: values[:failed]
     rescue StandardError => e
-      Rails.logger.error "[Sync::UploadJob] Error uploading to #{relay_url}: #{e.message}"
+      logger.error "Error uploading", relay_url:, error: e.message
       @sync_state&.mark_error!(e.message)
       raise
     end

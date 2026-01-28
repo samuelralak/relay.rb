@@ -12,10 +12,11 @@ module RelaySync
     attr_reader :connections
 
     class << self
-      attr_writer :logger
-
-      def logger
-        @logger ||= Logger.new(File::NULL)
+      def tagged_logger
+        @tagged_logger_mutex ||= Mutex.new
+        @tagged_logger_mutex.synchronize do
+          @tagged_logger ||= AppLogger["RelaySync::Manager"]
+        end
       end
     end
 
@@ -99,7 +100,7 @@ module RelaySync
 
     # Stop all connections
     def stop
-      logger.info "[RelaySync::Manager] Stopping sync manager"
+      tagged_logger.info "Stopping sync manager"
 
       @mutex.synchronize do
         @connections.values.each(&:disconnect)
@@ -123,8 +124,8 @@ module RelaySync
 
     private
 
-    def logger
-      self.class.logger
+    def tagged_logger
+      @tagged_logger ||= self.class.tagged_logger
     end
 
     def build_callbacks
@@ -145,11 +146,11 @@ module RelaySync
     # Connection callbacks
 
     def handle_connect(connection)
-      logger.info "[RelaySync::Manager] Connected to #{connection.url}"
+      tagged_logger.info "Connected", url: connection.url
     end
 
     def handle_disconnect(connection, code, reason)
-      logger.info "[RelaySync::Manager] Disconnected from #{connection.url}: #{code} - #{reason}"
+      tagged_logger.info "Disconnected", url: connection.url, code:, reason:
     end
 
     def handle_event(connection, subscription_id, event_data)
@@ -165,31 +166,31 @@ module RelaySync
     end
 
     def handle_eose(connection, subscription_id)
-      logger.debug "[RelaySync::Manager] EOSE for #{subscription_id} from #{connection.url}"
+      tagged_logger.debug "EOSE received", subscription_id:, url: connection.url
 
       handler = @handlers.consume_eose_handler(subscription_id)
       handler&.call
     end
 
     def handle_ok(connection, event_id, success, message)
-      logger.debug "[RelaySync::Manager] OK for #{event_id}: #{success} - #{message}"
+      tagged_logger.debug("OK received", event_id:, success:, message:)
 
       handler = @handlers.consume_ok_handler(event_id)
       handler&.call(success, message)
     end
 
     def handle_error(connection, message)
-      logger.error "[RelaySync::Manager] Error from #{connection.url}: #{message}"
+      tagged_logger.error "Connection error", url: connection.url, error: message
     end
 
     def handle_auth(connection, challenge)
       # NIP-42 authentication challenge received
       # Currently just logs - full implementation requires signing capability
-      logger.warn "[RelaySync::Manager] AUTH challenge from #{connection.url} - authentication not implemented"
+      tagged_logger.warn "AUTH challenge - authentication not implemented", url: connection.url
     end
 
     def handle_closed(connection, subscription_id, message)
-      logger.info "[RelaySync::Manager] CLOSED for #{subscription_id} from #{connection.url}: #{message}"
+      tagged_logger.info("CLOSED received", subscription_id:, url: connection.url, message:)
       # Subscription was closed by the relay - clean up any pending handlers
       unregister_neg_handler(subscription_id)
       unregister_eose_handler(subscription_id)
@@ -197,7 +198,7 @@ module RelaySync
     end
 
     def handle_neg_msg(connection, subscription_id, message)
-      logger.debug "[RelaySync::Manager] NEG-MSG for #{subscription_id} from #{connection.url}"
+      tagged_logger.debug "NEG-MSG received", subscription_id:, url: connection.url
 
       handler_info = @handlers.neg_handler_for(subscription_id)
       return unless handler_info
@@ -220,14 +221,14 @@ module RelaySync
           @handlers.unregister_neg_handler(subscription_id)
         end
       rescue StandardError => e
-        logger.error "[RelaySync::Manager] NEG-MSG processing error: #{e.message}"
+        tagged_logger.error "NEG-MSG processing error", error: e.message
         connection.neg_close(subscription_id)
         @handlers.unregister_neg_handler(subscription_id)
       end
     end
 
     def handle_neg_err(connection, subscription_id, error)
-      logger.error "[RelaySync::Manager] NEG-ERR for #{subscription_id} from #{connection.url}: #{error}"
+      tagged_logger.error("NEG-ERR received", subscription_id:, url: connection.url, error:)
 
       # Get the error callback before cleaning up
       handler_info = @handlers.neg_handler_for(subscription_id)

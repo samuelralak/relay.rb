@@ -2,6 +2,8 @@
 
 module Search
   class ExecuteSearch < BaseService
+    include Loggable
+
     option :search_query, type: Types::String
     option :filter, type: Types::Hash, default: -> { {} }
     option :limit, type: Types::Integer, default: -> { 100 }
@@ -56,7 +58,7 @@ module Search
 
       Success(events: ordered_events, total: response["hits"]["total"]["value"])
     rescue StandardError => e
-      Rails.logger.error "[Search::ExecuteSearch] Error: #{e.message}"
+      logger.error "Search error", error: e.message
       Failure(:search_error)
     end
 

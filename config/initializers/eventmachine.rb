@@ -5,7 +5,7 @@
 
 if defined?(EventMachine)
   Rails.application.config.after_initialize do
-    Rails.logger.info("[EventMachine] Loaded: #{defined?(EventMachine)}")
-    Rails.logger.info("[EventMachine] Reactor running: #{EventMachine.reactor_running?}")
+    AppLogger[:EventMachine].info "Loaded", status: defined?(EventMachine)
+    AppLogger[:EventMachine].info "Reactor running", status: EventMachine.reactor_running?
   end
 end

@@ -4,6 +4,8 @@ module Sync
   module Actions
     # Retries "error" states by resetting them to idle after a cooldown period.
     class RetryErroredSyncs < BaseService
+      include Loggable
+
       option :retry_after_seconds, type: Types::Integer.optional, default: -> { nil }
 
       def call
@@ -11,9 +13,8 @@ module Sync
         count = 0
 
         SyncState.errored.where("updated_at < ?", retry_after.ago).find_each do |state|
-          Rails.logger.info "[Sync::Actions::RetryErroredSyncs] Resetting errored sync for retry: " \
-                            "#{state.relay_url} (filter: #{state.filter_hash})"
-          Rails.logger.info "[Sync::Actions::RetryErroredSyncs] Previous error: #{state.error_message}"
+          logger.info "Resetting errored sync for retry", relay_url: state.relay_url, filter_hash: state.filter_hash
+          logger.info "Previous error", error: state.error_message
           state.reset_to_idle!
           count += 1
         end

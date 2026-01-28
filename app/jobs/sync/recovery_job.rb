@@ -4,19 +4,23 @@ module Sync
   # Recurring job that detects and recovers stale/errored sync operations
   # Scheduled via config/recurring.yml
   class RecoveryJob < ApplicationJob
+    include JobLoggable
+
     queue_as :sync
 
     def perform
-      Rails.logger.debug "[Sync::RecoveryJob] Checking for stale syncs..."
+      logger.debug "Checking for stale syncs..."
 
       result = ::Sync::RecoverStale.call
       values = result.value!
 
       if values[:recovered_stale] > 0 || values[:retried_errors] > 0
-        Rails.logger.info "[Sync::RecoveryJob] Recovered: #{values[:recovered_stale]} stale, #{values[:retried_errors]} errors"
+        logger.info "Recovered syncs",
+          stale: values[:recovered_stale],
+          errors: values[:retried_errors]
       end
     rescue StandardError => e
-      Rails.logger.error "[Sync::RecoveryJob] Error during recovery: #{e.message}"
+      logger.error "Error during recovery", error: e.message
       raise
     end
   end

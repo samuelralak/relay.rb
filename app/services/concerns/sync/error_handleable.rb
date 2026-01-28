@@ -15,7 +15,7 @@ module Sync
     end
 
     def handle_sync_error(error, manage_status: true)
-      Rails.logger.error "[#{self.class.name}] Error: #{error.message}"
+      AppLogger[self.class.name].error "Sync error", error: error.message
       mark_sync_error!(error.message) if manage_status
     end
 

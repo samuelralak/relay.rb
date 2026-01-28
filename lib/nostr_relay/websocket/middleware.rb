@@ -7,6 +7,15 @@ require "concurrent"
 module NostrRelay
   module Websocket
     class Middleware
+      class << self
+        def tagged_logger
+          @tagged_logger_mutex ||= Mutex.new
+          @tagged_logger_mutex.synchronize do
+            @tagged_logger ||= AppLogger["NostrRelay::WebSocket::Middleware"]
+          end
+        end
+      end
+
       # Thread pool to prevent thread exhaustion (Heroku has low ulimit)
       THREAD_POOL = Concurrent::FixedThreadPool.new(
         ENV.fetch("WEBSOCKET_THREAD_POOL_SIZE", 10).to_i,
@@ -53,7 +62,7 @@ module NostrRelay
         THREAD_POOL.post do
           Rails.application.executor.wrap(&)
         rescue StandardError => e
-          Config.logger.error("[NostrRelay] Thread pool error: #{e.class}: #{e.message}")
+          self.class.tagged_logger.error "Thread pool error", error: "#{e.class}: #{e.message}"
         end
       end
 

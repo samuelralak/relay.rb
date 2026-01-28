@@ -4,6 +4,7 @@ module Sync
   # Performs Negentropy (NIP-77) set reconciliation with a remote relay.
   # Downloads events we need and schedules uploads for events we have.
   class SyncWithNegentropy < BaseService
+    include Loggable
     include Connectionable
     include TimeoutWaitable
     include ErrorHandleable
@@ -95,8 +96,8 @@ module Sync
     end
 
     def process_sync_results
-      Rails.logger.info "[SyncWithNegentropy] process_sync_results: have_ids=#{@have_ids.size}, need_ids=#{@need_ids.size}"
-      Rails.logger.info "[SyncWithNegentropy] direction=#{direction}, should_download?=#{should_download?}"
+      logger.info "Processing sync results", have_ids: @have_ids.size, need_ids: @need_ids.size
+      logger.info "Sync direction", direction:, should_download: should_download?
 
       Performers::ProcessReconciliationResults.call(
         connection:,

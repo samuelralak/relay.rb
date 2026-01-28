@@ -6,6 +6,13 @@ module NostrRelay
     module Event
       include Dry::Monads[:result]
 
+      def self.tagged_logger
+        @tagged_logger_mutex ||= Mutex.new
+        @tagged_logger_mutex.synchronize do
+          @tagged_logger ||= AppLogger["NostrRelay::Handlers::Event"]
+        end
+      end
+
       module_function
 
       def call(connection:, payload:)
@@ -27,7 +34,7 @@ module NostrRelay
           connection.send_ok(event_id, false, "#{Messages::Prefix::ERROR} #{message}")
         end
       rescue StandardError => e
-        Config.logger.error("[NostrRelay] Event handler error: #{e.class}: #{e.message}")
+        Event.tagged_logger.error "Event handler error", error: "#{e.class}: #{e.message}"
         connection.send_ok(extract_event_id(payload), false, "#{Messages::Prefix::ERROR} internal error")
       end
 

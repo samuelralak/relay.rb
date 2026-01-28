@@ -5,6 +5,8 @@ module Search
   # Falls back to PostgreSQL if OpenSearch unavailable or for tag filters
   # (current index stores tag values without tag names)
   class QueryByFilters < BaseService
+    include Loggable
+
     option :filters, type: Types::Array, default: -> { [] }
     option :limit, type: Types::Integer, default: -> { 500 }
 
@@ -44,10 +46,10 @@ module Search
 
       Success(events: ordered_events)
     rescue OpenSearch::Transport::Transport::Errors::BadRequest => e
-      Rails.logger.error "[Search::QueryByFilters] OpenSearch error: #{e.message}"
+      logger.error "OpenSearch error", error: e.message
       database_fallback
     rescue StandardError => e
-      Rails.logger.error "[Search::QueryByFilters] Error: #{e.message}"
+      logger.error "Error", error: e.message
       database_fallback
     end
 

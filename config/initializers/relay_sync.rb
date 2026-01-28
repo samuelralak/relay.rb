@@ -11,7 +11,3 @@ Rails.application.config.after_initialize do
     config.relay_provider = UpstreamRelay
   end
 end
-
-# Configure logging to use Rails logger
-RelaySync::Connection.logger = Rails.logger
-RelaySync::Manager.logger = Rails.logger

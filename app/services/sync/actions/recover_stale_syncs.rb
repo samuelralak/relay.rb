@@ -5,6 +5,8 @@ module Sync
     # Resets stuck "syncing" states back to idle.
     # States are considered stale if they've been syncing longer than the threshold.
     class RecoverStaleSyncs < BaseService
+      include Loggable
+
       option :threshold_seconds, type: Types::Integer.optional, default: -> { nil }
 
       def call
@@ -12,8 +14,7 @@ module Sync
         count = 0
 
         SyncState.syncing.where("updated_at < ?", threshold.ago).find_each do |state|
-          Rails.logger.warn "[Sync::Actions::RecoverStaleSyncs] Recovering stale sync: " \
-                            "#{state.relay_url} (filter: #{state.filter_hash})"
+          logger.warn "Recovering stale sync", relay_url: state.relay_url, filter_hash: state.filter_hash
           state.reset_to_idle!
           count += 1
         end

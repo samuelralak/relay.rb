@@ -5,6 +5,13 @@ require "json"
 module NostrRelay
   # Routes incoming WebSocket messages to appropriate handlers.
   module Router
+    def self.tagged_logger
+      @tagged_logger_mutex ||= Mutex.new
+      @tagged_logger_mutex.synchronize do
+        @tagged_logger ||= AppLogger["NostrRelay::Router"]
+      end
+    end
+
     module_function
 
     def route(connection:, data:)
@@ -49,7 +56,7 @@ module NostrRelay
     rescue JSON::ParserError
       connection.send_notice("#{Messages::Prefix::INVALID} invalid JSON")
     rescue StandardError => e
-      Config.logger.error("[NostrRelay] Router error: #{e.class}: #{e.message}\n#{e.backtrace.first(5).join("\n")}")
+      Router.tagged_logger.error "Router error", error: "#{e.class}: #{e.message}", backtrace: e.backtrace.first(5)
       connection.send_notice("#{Messages::Prefix::ERROR} internal error")
     end
   end

@@ -10,6 +10,12 @@ module NostrRelay
   # Connection management delegated to ConnectionRegistry.
   module Subscriptions
     class << self
+      def tagged_logger
+        @tagged_logger_mutex ||= Mutex.new
+        @tagged_logger_mutex.synchronize do
+          @tagged_logger ||= AppLogger["NostrRelay::Subscriptions"]
+        end
+      end
       # Delegate connection access to ConnectionRegistry (for backwards compatibility)
       def connections
         ConnectionRegistry.connections
@@ -173,7 +179,7 @@ module NostrRelay
         connection.send_event(sub_id, event_data)
         true
       rescue StandardError => e
-        Config.logger.error("[NostrRelay] Broadcast error to connection #{connection.id}: #{e.message}")
+        tagged_logger.error "Broadcast error", connection_id: connection.id, error: e.message
         false
       end
     end

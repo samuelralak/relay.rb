@@ -10,6 +10,13 @@ module NostrRelay
   module RedisPubsub
     CHANNEL = "nostr_relay:broadcasts"
 
+    def self.tagged_logger
+      @tagged_logger_mutex ||= Mutex.new
+      @tagged_logger_mutex.synchronize do
+        @tagged_logger ||= AppLogger["NostrRelay::RedisPubsub"]
+      end
+    end
+
     class << self
       # Publish event to Redis for cross-worker broadcast
       # @param type [Symbol] :event or :ephemeral
@@ -20,7 +27,7 @@ module NostrRelay
         message = { type: type.to_s, data:, worker_id: }.to_json
         redis_pool.with { |conn| conn.publish(CHANNEL, message) }
       rescue Redis::BaseError => e
-        Config.logger.error("[RedisPubsub] Publish failed: #{e.message}")
+        tagged_logger.error "Publish failed", error: e.message
       end
 
       # Start subscriber thread (called on worker boot)
@@ -30,7 +37,7 @@ module NostrRelay
 
         @subscriber_thread = Thread.new { subscribe_loop }
         @subscriber_thread.abort_on_exception = false
-        Config.logger.info("[RedisPubsub] Subscriber started: #{worker_id}")
+        tagged_logger.info "Subscriber started", worker_id:
       end
 
       # Stop subscriber thread (called on shutdown)
@@ -41,7 +48,7 @@ module NostrRelay
         @subscriber_redis&.close rescue nil
         @subscriber_thread.join(5) rescue nil
         @subscriber_thread = nil
-        Config.logger.info("[RedisPubsub] Subscriber stopped")
+        tagged_logger.info "Subscriber stopped"
       end
 
       # Check if Redis is configured and available
@@ -113,12 +120,12 @@ module NostrRelay
             end
           rescue Redis::BaseConnectionError => e
             break if @shutdown
-            Config.logger.warn("[RedisPubsub] Reconnecting in #{backoff}s: #{e.message}")
+            tagged_logger.warn "Reconnecting", backoff_seconds: backoff, error: e.message
             sleep backoff
             backoff = [ backoff * 2, 30 ].min # Exponential backoff, max 30s
           rescue StandardError => e
             break if @shutdown
-            Config.logger.error("[RedisPubsub] Error: #{e.class}: #{e.message}")
+            tagged_logger.error "Subscribe loop error", error: "#{e.class}: #{e.message}"
             sleep backoff
             backoff = [ backoff * 2, 30 ].min
           end
@@ -136,9 +143,9 @@ module NostrRelay
           Subscriptions.broadcast_ephemeral_remote(message[:data])
         end
       rescue JSON::ParserError => e
-        Config.logger.error("[RedisPubsub] Invalid JSON: #{e.message}")
+        tagged_logger.error "Invalid JSON", error: e.message
       rescue StandardError => e
-        Config.logger.error("[RedisPubsub] Handle error: #{e.message}")
+        tagged_logger.error "Handle message error", error: e.message
       end
     end
   end
