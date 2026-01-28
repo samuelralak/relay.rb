@@ -9,8 +9,9 @@ module NostrRelay
       EVENT = "EVENT"
       REQ   = "REQ"
       CLOSE = "CLOSE"
+      AUTH  = "AUTH"  # NIP-42
 
-      ALL = [ EVENT, REQ, CLOSE ].freeze
+      ALL = [ EVENT, REQ, CLOSE, AUTH ].freeze
     end
 
     # Relay → Client message types
@@ -20,21 +21,23 @@ module NostrRelay
       EOSE   = "EOSE"
       CLOSED = "CLOSED"
       NOTICE = "NOTICE"
+      AUTH   = "AUTH"  # NIP-42
 
-      ALL = [ EVENT, OK, EOSE, CLOSED, NOTICE ].freeze
+      ALL = [ EVENT, OK, EOSE, CLOSED, NOTICE, AUTH ].freeze
     end
 
     # OK/CLOSED message prefixes (NIP-01)
     # Format: "prefix: human-readable message"
     module Prefix
-      DUPLICATE    = "duplicate:"
-      INVALID      = "invalid:"
-      BLOCKED      = "blocked:"
-      RATE_LIMITED = "rate-limited:"
-      RESTRICTED   = "restricted:"
-      POW          = "pow:"
-      ERROR        = "error:"
-      MUTE         = "mute:"
+      DUPLICATE     = "duplicate:"
+      INVALID       = "invalid:"
+      BLOCKED       = "blocked:"
+      RATE_LIMITED  = "rate-limited:"
+      RESTRICTED    = "restricted:"
+      POW           = "pow:"
+      ERROR         = "error:"
+      MUTE          = "mute:"
+      AUTH_REQUIRED = "auth-required:"  # NIP-42
 
       # Build a prefixed message
       def self.build(prefix, message = "")
