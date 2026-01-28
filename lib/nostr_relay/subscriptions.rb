@@ -69,6 +69,9 @@ module NostrRelay
       # Broadcast a persisted event to all matching subscriptions
       # Publishes to Redis for cross-worker delivery, then broadcasts locally
       def broadcast(event)
+        # NIP-42: Never broadcast authentication events
+        return if event.kind == Events::Kinds::AUTH
+
         event_hash = Config.event_serializer.serialize(event)
         RedisPubsub.publish(type: :event, data: event_hash)
         broadcast_locally(event_hash)
@@ -77,18 +80,30 @@ module NostrRelay
       # Called from RedisPubsub when receiving cross-worker message
       # Skips Redis publish to avoid loops
       def broadcast_remote(event_hash)
+        # NIP-42: Never broadcast authentication events (defense-in-depth)
+        kind = event_hash["kind"] || event_hash[:kind]
+        return if kind == Events::Kinds::AUTH
+
         broadcast_locally(event_hash)
       end
 
       # Broadcast an ephemeral event (not persisted) to matching subscriptions
       # Publishes to Redis for cross-worker delivery, then broadcasts locally
       def broadcast_ephemeral(event_data)
+        # NIP-42: Never broadcast authentication events
+        kind = event_data["kind"] || event_data[:kind]
+        return if kind == Events::Kinds::AUTH
+
         RedisPubsub.publish(type: :ephemeral, data: event_data)
         broadcast_ephemeral_locally(event_data)
       end
 
       # Called from RedisPubsub when receiving cross-worker ephemeral message
       def broadcast_ephemeral_remote(event_data)
+        # NIP-42: Never broadcast authentication events (defense-in-depth)
+        kind = event_data["kind"] || event_data[:kind]
+        return if kind == Events::Kinds::AUTH
+
         broadcast_ephemeral_locally(event_data)
       end
 

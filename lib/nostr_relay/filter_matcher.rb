@@ -13,6 +13,10 @@ module NostrRelay
     # @return [Boolean] true if any filter matches
     def matches?(filters, event_hash, check_search: true)
       data = event_hash.transform_keys(&:to_s)
+
+      # NIP-42: Auth events (kind 22242) never match subscriptions
+      return false if data["kind"] == Events::Kinds::AUTH
+
       filters.any? { |filter| filter_matches?(filter, data, check_search:) }
     end
 
