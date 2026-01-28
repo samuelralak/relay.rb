@@ -34,11 +34,31 @@ module NostrTestHelpers
   # Mock Connection wrapping MockWebSocket for NostrRelay testing
   class MockConnection
     attr_reader :id, :ws, :sent_messages
+    attr_accessor :challenge, :authenticated_pubkeys
 
     def initialize
       @id = SecureRandom.uuid
       @ws = MockWebSocket.new
       @sent_messages = []
+      @challenge = nil
+      @authenticated_pubkeys = Set.new
+    end
+
+    # NIP-42: Check if connection is authenticated
+    def authenticated?(pubkey = nil)
+      pubkey ? @authenticated_pubkeys.include?(pubkey) : @authenticated_pubkeys.any?
+    end
+
+    # NIP-42: Add authenticated pubkey
+    def add_authenticated_pubkey(pubkey)
+      @authenticated_pubkeys.add(pubkey)
+    end
+
+    # NIP-42: Send AUTH challenge
+    def send_auth(challenge)
+      msg = [ "AUTH", challenge ]
+      @sent_messages << msg
+      @ws.send(msg.to_json)
     end
 
     def send_event(sub_id, event)

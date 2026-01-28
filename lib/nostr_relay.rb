@@ -6,6 +6,7 @@ require_relative "nostr_relay/filter_matcher"
 require_relative "nostr_relay/connection_registry"
 require_relative "nostr_relay/redis_pubsub"
 require_relative "nostr_relay/messages"
+require_relative "nostr_relay/auth_policy"
 require_relative "nostr_relay/connection"
 require_relative "nostr_relay/router"
 require_relative "nostr_relay/subscription"
@@ -15,10 +16,13 @@ require_relative "nostr_relay/subscriptions"
 require_relative "nostr_relay/handlers/event"
 require_relative "nostr_relay/handlers/req"
 require_relative "nostr_relay/handlers/close"
+require_relative "nostr_relay/handlers/auth"
 
 # Contracts
+require_relative "nostr_relay/contracts/event_constants"
 require_relative "nostr_relay/contracts/event_contract"
 require_relative "nostr_relay/contracts/filter_contract"
+require_relative "nostr_relay/contracts/auth_event_contract"
 
 # Websocket
 require_relative "nostr_relay/websocket/middleware"
