@@ -16,17 +16,38 @@ module NostrRelay
       end
     end
 
-    attr_reader :id
+    attr_reader :id, :challenge, :authenticated_pubkeys
 
     def initialize(websocket)
       @ws = websocket
       @id = SecureRandom.uuid
       @send_mutex = Mutex.new
+      @challenge = nil
+      @authenticated_pubkeys = Set.new
     end
 
     def on_open
       Subscriptions.register(self)
+      send_auth_challenge if Config.auth_enabled?
       tagged_logger.info "Connection opened", id: @id
+    end
+
+    # NIP-42: Check if connection is authenticated
+    # @param pubkey [String, nil] Optional pubkey to check. If nil, checks if any pubkey is authenticated.
+    # @return [Boolean] True if authenticated
+    def authenticated?(pubkey = nil)
+      if pubkey
+        @authenticated_pubkeys.include?(pubkey)
+      else
+        @authenticated_pubkeys.any?
+      end
+    end
+
+    # NIP-42: Add an authenticated pubkey to this connection
+    # @param pubkey [String] The authenticated pubkey (64 hex chars)
+    def add_authenticated_pubkey(pubkey)
+      @authenticated_pubkeys.add(pubkey)
+      tagged_logger.info "Pubkey authenticated", id: @id, pubkey: "#{pubkey[0..15]}..."
     end
 
     def on_message(data)
@@ -84,20 +105,41 @@ module NostrRelay
       send_message([ Messages::Outbound::NOTICE, message ])
     end
 
+    # NIP-42: Send AUTH challenge to client
+    # @param challenge [String] The challenge string
+    def send_auth(challenge)
+      send_message([ Messages::Outbound::AUTH, challenge ])
+    end
+
     private
+
+    # NIP-42: Generate and send authentication challenge on connection open
+    def send_auth_challenge
+      result = ::Auth::Actions::GenerateChallenge.call
+      if result.success?
+        @challenge = result.value![:challenge]
+        send_auth(@challenge)
+        tagged_logger.debug "AUTH challenge sent", id: @id
+      end
+    end
 
     def tagged_logger
       @tagged_logger ||= self.class.tagged_logger
     end
 
     # Thread-safe message sending
-    # faye-websocket buffers writes, mutex prevents concurrent corruption
+    # Schedule on EM reactor to ensure immediate delivery when called from thread pool
     def send_message(payload)
       json = payload.to_json
       tagged_logger.debug "Sending message", id: @id, preview: json[0..100]
 
-      @send_mutex.synchronize do
-        @ws.send(json)
+      if EM.reactor_running?
+        # Schedule on reactor thread for immediate processing
+        EM.next_tick do
+          @send_mutex.synchronize { @ws.send(json) }
+        end
+      else
+        @send_mutex.synchronize { @ws.send(json) }
       end
     rescue StandardError => e
       tagged_logger.error "Failed to send message", id: @id, error: "#{e.class}: #{e.message}"
