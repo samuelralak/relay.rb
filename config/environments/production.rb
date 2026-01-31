@@ -88,6 +88,10 @@ Rails.application.configure do
   # Skip DNS rebinding protection for the default health check endpoint.
   # config.host_authorization = { exclude: ->(request) { request.path == "/up" } }
 
+  # Allow ActionCable connections from any origin (Stats dashboard uses WebSocket)
+  # In production, you may want to restrict this to specific domains
+  config.action_cable.disable_request_forgery_protection = true
+
   # WebSocket middleware MUST be first to handle upgrade before other middleware interferes
   config.middleware.insert_before 0, NostrRelay::Websocket::Middleware
 end

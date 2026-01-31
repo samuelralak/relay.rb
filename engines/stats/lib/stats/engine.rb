@@ -19,16 +19,8 @@ module Stats
       end
     end
 
-    # Ensure ActionCable channels are loaded
-    # This is necessary because API-only apps don't autoload channels by default
-    initializer "stats.action_cable", after: "action_cable.set_configs" do
-      ActiveSupport.on_load(:action_cable) do
-        # Explicitly require the channel to ensure it's available
-        require_dependency Stats::Engine.root.join("app/channels/stats/metrics_channel")
-      end
-    end
-
-    # Add engine paths to Rails autoload
+    # Add engine paths to Rails autoload and eager_load
+    # This ensures channels and jobs are loaded in both development and production
     config.autoload_paths += %W[
       #{root}/app/channels
       #{root}/app/jobs
