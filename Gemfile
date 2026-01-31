@@ -22,6 +22,11 @@ gem "solid_cache"
 gem "solid_queue"
 gem "solid_cable"
 
+# Hotwire for real-time dashboard
+gem "importmap-rails"
+gem "turbo-rails"
+gem "stimulus-rails"
+
 # Reduces boot times through caching; required in config/boot.rb
 gem "bootsnap", require: false
 
@@ -79,3 +84,6 @@ gem "connection_pool", "~> 2.4"
 gem "opensearch-ruby", "~> 3.0"
 
 gem "barnes", "~> 0.0.9"
+
+# Stats dashboard engine
+gem "stats", path: "engines/stats"

@@ -32,6 +32,11 @@ module RelayRb
     # Skip views, helpers and assets when generating a new resource.
     config.api_only = true
 
+    # Add session middleware for Stats dashboard (mounted engine requires sessions)
+    config.middleware.use ActionDispatch::Cookies
+    config.middleware.use ActionDispatch::Session::CookieStore, key: "_relay_session"
+    config.middleware.use ActionDispatch::Flash
+
     # Use UUID as the primary key type
     config.generators do |generator|
       generator.orm :active_record, primary_key_type: :uuid
