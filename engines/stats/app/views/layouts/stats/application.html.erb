@@ -49,8 +49,19 @@
       border-radius: 16px;
     }
 
+    /* Smooth transition for value updates */
+    .stat-value, [id^="stat-"] {
+      transition: background-color 0.4s ease-out;
+    }
+
     [data-updating="true"] {
-      background: rgba(34, 197, 94, 0.08) !important;
+      background: rgba(34, 197, 94, 0.12) !important;
+      border-radius: 4px;
+    }
+
+    /* Smooth table row transitions */
+    .table-row {
+      transition: background-color 0.2s ease;
     }
 
     .stat-value {
@@ -210,12 +221,34 @@
         }
       }
 
+      function setPolling() {
+        if (statusDot) statusDot.className = 'w-2 h-2 rounded-full bg-amber-500'
+        if (statusText) {
+          statusText.textContent = 'Polling'
+          statusText.className = 'text-sm text-amber-500'
+        }
+      }
+
+      // Track previous values to only highlight actual changes
+      const previousValues = new Map()
+
       function updateElement(id, value) {
         const el = document.getElementById(id)
-        if (el) {
+        if (!el) return
+
+        const stringValue = String(value)
+        const previousValue = previousValues.get(id)
+
+        // Only update if value actually changed
+        if (previousValue === stringValue) return
+
+        previousValues.set(id, stringValue)
+        el.textContent = stringValue
+
+        // Only show highlight animation when value changes (not on first load)
+        if (previousValue !== undefined) {
           el.setAttribute('data-updating', 'true')
-          el.textContent = value
-          setTimeout(() => el.removeAttribute('data-updating'), 300)
+          setTimeout(() => el.removeAttribute('data-updating'), 400)
         }
       }
 
@@ -235,8 +268,11 @@
       }
 
       function formatTimeAgo(isoString) {
+        if (!isoString) return '—'
         const date = new Date(isoString)
+        if (isNaN(date.getTime())) return '—'
         const seconds = Math.floor((new Date() - date) / 1000)
+        if (seconds < 0) return 'now' // Future dates (clock skew)
         if (seconds < 60) return 'now'
         const mins = Math.floor(seconds / 60)
         if (mins < 60) return `${mins}m`
@@ -256,10 +292,45 @@
       let allConnections = []
       let currentPage = 1
       let perPage = 10
+      // Track connection IDs for smart diffing
+      let previousConnectionIds = []
 
       function updateConnectionsTable(connections) {
+        // Check if connections actually changed before re-rendering
+        const newIds = connections.map(c => c.id).join(',')
+        const oldIds = previousConnectionIds.join(',')
+
+        // Also check subscription counts and other mutable fields
+        const newFingerprint = connections.map(c => `${c.id}:${c.subscription_count}:${c.authenticated_pubkeys?.length || 0}`).join('|')
+        const oldFingerprint = allConnections.map(c => `${c.id}:${c.subscription_count}:${c.authenticated_pubkeys?.length || 0}`).join('|')
+
+        if (newFingerprint === oldFingerprint && newIds === oldIds) {
+          // Only update "time ago" fields without full re-render
+          updateConnectionTimes()
+          return
+        }
+
+        previousConnectionIds = connections.map(c => c.id)
         allConnections = connections
         renderConnectionsPage()
+      }
+
+      // Update only the time-ago cells without full re-render
+      function updateConnectionTimes() {
+        const rows = document.querySelectorAll('#connections-tbody tr[data-connection-id]')
+        rows.forEach(row => {
+          const connId = row.getAttribute('data-connection-id')
+          const conn = allConnections.find(c => c.id === connId)
+          if (conn) {
+            const timeCell = row.querySelector('.time-ago')
+            if (timeCell) {
+              const newTime = formatTimeAgo(conn.connected_at)
+              if (timeCell.textContent !== newTime) {
+                timeCell.textContent = newTime
+              }
+            }
+          }
+        })
       }
 
       function renderConnectionsPage() {
@@ -275,7 +346,9 @@
         const pageConnections = allConnections.slice(start, end)
 
         const totalEl = document.getElementById('connections-total')
-        if (totalEl) totalEl.textContent = total
+        if (totalEl && totalEl.textContent !== String(total)) {
+          totalEl.textContent = total
+        }
 
         if (total === 0) {
           tbody.innerHTML = `
@@ -287,8 +360,9 @@
           return
         }
 
-        tbody.innerHTML = pageConnections.map(conn => `
-          <tr class="table-row border-t border-[#1f1f1f]">
+        // Build new rows
+        const newHtml = pageConnections.map(conn => `
+          <tr class="table-row border-t border-[#1f1f1f]" data-connection-id="${escapeHtml(conn.id)}">
             <td class="py-4 font-mono text-sm text-[#a3a3a3]">${escapeHtml(conn.id?.substring(0, 12) || '')}</td>
             <td class="py-4 text-[#a3a3a3]">${escapeHtml(conn.ip_address) || '—'}</td>
             <td class="py-4">
@@ -297,10 +371,11 @@
             <td class="py-4">
               <span class="pill pill-purple">${Number(conn.subscription_count) || 0}</span>
             </td>
-            <td class="py-4 text-[#525252] text-sm">${formatTimeAgo(conn.connected_at)}</td>
+            <td class="py-4 text-[#525252] text-sm time-ago">${formatTimeAgo(conn.connected_at)}</td>
           </tr>
         `).join('')
 
+        tbody.innerHTML = newHtml
         updatePaginationControls(start + 1, end, total)
       }
 
@@ -315,9 +390,9 @@
         if (!pagination) return
         pagination.classList.toggle('hidden', total <= perPage)
 
-        if (startEl) startEl.textContent = start
-        if (endEl) endEl.textContent = end
-        if (totalEl) totalEl.textContent = total
+        if (startEl && startEl.textContent !== String(start)) startEl.textContent = start
+        if (endEl && endEl.textContent !== String(end)) endEl.textContent = end
+        if (totalEl && totalEl.textContent !== String(total)) totalEl.textContent = total
         if (prevBtn) prevBtn.disabled = currentPage <= 1
         if (nextBtn) nextBtn.disabled = currentPage >= Math.ceil(total / perPage)
       }
@@ -369,9 +444,9 @@
         constructor() {
           this.wsConnected = false
           this.pollInterval = null
+          this.lastUpdateTime = 0
+          this.updateDebounceMs = 1000 // Minimum 1 second between updates
           this.connect()
-          // Start polling as fallback - runs alongside WebSocket
-          this.startPolling()
         }
 
         connect() {
@@ -387,13 +462,21 @@
             }
 
             this.ws.onmessage = (event) => {
-              const data = JSON.parse(event.data)
+              let data
+              try {
+                data = JSON.parse(event.data)
+              } catch (e) {
+                console.error('Failed to parse WebSocket message:', e)
+                return
+              }
               if (data.type === 'ping') return
               if (data.type === 'welcome') return
               if (data.type === 'confirm_subscription') {
                 console.log('Subscription confirmed')
                 this.wsConnected = true
                 setConnected()
+                // Stop polling when WebSocket is confirmed
+                this.stopPolling()
                 return
               }
               if (data.message) this.handleMessage(data.message)
@@ -403,6 +486,8 @@
               console.log('WebSocket closed:', event.code, event.reason)
               this.wsConnected = false
               setDisconnected()
+              // Start polling as fallback when WebSocket disconnects
+              this.startPolling()
               setTimeout(() => this.connect(), 3000)
             }
 
@@ -410,11 +495,15 @@
               console.error('WebSocket error:', error)
               this.wsConnected = false
               setDisconnected()
+              // Start polling as fallback on error
+              this.startPolling()
             }
           } catch (error) {
             console.error('Failed to create WebSocket:', error)
             this.wsConnected = false
             setDisconnected()
+            // Start polling as fallback
+            this.startPolling()
           }
         }
 
@@ -425,28 +514,42 @@
           }))
         }
 
-        // Polling fallback - fetches from API endpoint
+        // Polling fallback - only runs when WebSocket is not connected
         startPolling() {
+          if (this.pollInterval) return // Already polling
+          console.log('Starting polling fallback')
+          setPolling()
           // Poll every 5 seconds as backup
           this.pollInterval = setInterval(() => {
-            this.poll()
+            if (!this.wsConnected) {
+              this.poll()
+            }
           }, 5000)
+          // Also poll immediately
+          this.poll()
+        }
+
+        stopPolling() {
+          if (this.pollInterval) {
+            console.log('Stopping polling - WebSocket connected')
+            clearInterval(this.pollInterval)
+            this.pollInterval = null
+          }
         }
 
         async poll() {
+          if (this.wsConnected) return // Don't poll if WebSocket is connected
+
           try {
             const response = await fetch('<%= api_metrics_path %>')
             if (response.ok) {
               const data = await response.json()
               this.handleMessage(data)
-              // If WebSocket isn't connected, show "Polling" status
               if (!this.wsConnected) {
-                if (statusDot) statusDot.className = 'w-2 h-2 rounded-full bg-amber-500'
-                if (statusText) {
-                  statusText.textContent = 'Polling'
-                  statusText.className = 'text-sm text-amber-500'
-                }
+                setPolling()
               }
+            } else {
+              console.warn('Poll returned non-OK status:', response.status)
             }
           } catch (error) {
             console.error('Poll error:', error)
@@ -459,6 +562,13 @@
             return
           }
 
+          // Debounce updates to prevent rapid flickering
+          const now = Date.now()
+          if (now - this.lastUpdateTime < this.updateDebounceMs) {
+            return
+          }
+          this.lastUpdateTime = now
+
           updateElement('stat-connections', formatNumber(data.connections.total))
           updateElement('stat-subscriptions', formatNumber(data.connections.total_subscriptions))
           updateElement('stat-events-total', formatNumber(data.events.total))
@@ -466,6 +576,7 @@
           updateElement('stat-events-per-min', data.events.per_minute.toFixed(1))
           updateElement('stat-memory', data.system.memory.rss_mb)
           updateElement('stat-memory-panel', data.system.memory.rss_mb)
+          updateElement('stat-memory-total', data.system.memory.total_mb)
           updateElement('stat-cpu', data.system.cpu.load_percent)
           updateElement('stat-load-avg', data.system.cpu.load_average)
           updateElement('stat-threads', data.system.process.thread_count)
@@ -477,6 +588,7 @@
             window.updateProgressBars(
               data.system.cpu.load_percent,
               data.system.memory.rss_mb,
+              data.system.memory.total_mb,
               data.system.database.connections_in_use,
               data.system.database.pool_size
             )

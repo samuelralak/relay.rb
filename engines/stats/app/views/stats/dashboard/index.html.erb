@@ -89,18 +89,33 @@
             <p class="text-[#525252] text-sm">Total stored</p>
           </div>
         </div>
-        <% if @stats[:events][:last_7_days].present? %>
-          <div style="height: 240px;">
+        <div style="height: 240px; position: relative;">
+          <!-- Loading state -->
+          <div class="chart-loading absolute inset-0 flex items-center justify-center text-[#525252]" style="display: flex;">
+            <div class="flex items-center gap-2">
+              <svg class="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+              <span>Loading chart...</span>
+            </div>
+          </div>
+          <!-- Error state -->
+          <div class="chart-error absolute inset-0 flex items-center justify-center text-[#525252]" style="display: none;">
+          </div>
+          <!-- Chart canvas -->
+          <% if @stats[:events][:last_7_days].present? %>
             <canvas id="events-chart"
                     data-labels="<%= @stats[:events][:last_7_days].keys.to_json %>"
-                    data-values="<%= @stats[:events][:last_7_days].values.to_json %>">
+                    data-values="<%= @stats[:events][:last_7_days].values.to_json %>"
+                    style="display: none;">
             </canvas>
-          </div>
-        <% else %>
-          <div class="flex items-center justify-center h-60 text-[#525252]">
-            No events in the last 7 days
-          </div>
-        <% end %>
+          <% else %>
+            <div class="absolute inset-0 flex items-center justify-center text-[#525252]">
+              No events in the last 7 days
+            </div>
+          <% end %>
+        </div>
       </div>
 
       <!-- System Resources Panel -->
@@ -122,10 +137,11 @@
         <div class="mb-6">
           <div class="flex items-center justify-between mb-2">
             <span class="text-[#737373] text-sm">Memory (RSS)</span>
-            <span class="text-sm font-medium"><span id="stat-memory-panel" data-updating="false"><%= @stats[:system][:memory][:rss_mb] %></span> MB</span>
+            <span class="text-sm font-medium"><span id="stat-memory-panel" data-updating="false"><%= @stats[:system][:memory][:rss_mb] %></span> / <span id="stat-memory-total"><%= @stats[:system][:memory][:total_mb] %></span> MB</span>
           </div>
           <div class="h-2 bg-[#1f1f1f] rounded-full overflow-hidden">
-            <div id="memory-bar" class="h-2 bg-pink-500 rounded-full transition-all duration-500" style="width: <%= [(@stats[:system][:memory][:rss_mb] / 512.0 * 100), 100].min %>%"></div>
+            <% memory_percent = @stats[:system][:memory][:total_mb].to_f > 0 ? (@stats[:system][:memory][:rss_mb].to_f / @stats[:system][:memory][:total_mb] * 100) : 0 %>
+            <div id="memory-bar" class="h-2 bg-pink-500 rounded-full transition-all duration-500" style="width: <%= [memory_percent, 100].min %>%"></div>
           </div>
         </div>
 
@@ -136,7 +152,8 @@
             <span id="stat-db-pool" class="text-sm font-medium" data-updating="false"><%= @stats[:system][:database][:connections_in_use] %>/<%= @stats[:system][:database][:pool_size] %></span>
           </div>
           <div class="h-2 bg-[#1f1f1f] rounded-full overflow-hidden">
-            <div id="db-bar" class="h-full bg-blue-500 rounded-full transition-all duration-500" style="width: <%= (@stats[:system][:database][:connections_in_use].to_f / @stats[:system][:database][:pool_size] * 100) %>%"></div>
+            <% db_percent = @stats[:system][:database][:pool_size].to_i > 0 ? (@stats[:system][:database][:connections_in_use].to_f / @stats[:system][:database][:pool_size] * 100) : 0 %>
+            <div id="db-bar" class="h-full bg-blue-500 rounded-full transition-all duration-500" style="width: <%= [db_percent, 100].min %>%"></div>
           </div>
         </div>
 
@@ -191,7 +208,7 @@
           </thead>
           <tbody id="connections-tbody">
             <% @stats[:connections][:details].first(10).each do |conn| %>
-              <tr class="table-row border-t border-[#1f1f1f]">
+              <tr class="table-row border-t border-[#1f1f1f]" data-connection-id="<%= conn[:id] %>">
                 <td class="py-4 font-mono text-sm text-[#a3a3a3]"><%= conn[:id][0..11] %></td>
                 <td class="py-4 text-[#a3a3a3]"><%= conn[:ip_address] || "—" %></td>
                 <td class="py-4">
@@ -204,7 +221,7 @@
                 <td class="py-4">
                   <span class="pill pill-purple"><%= conn[:subscription_count] %></span>
                 </td>
-                <td class="py-4 text-[#525252] text-sm" data-connected-at="<%= conn[:connected_at] %>"><%= time_ago_in_words(Time.parse(conn[:connected_at])) rescue conn[:connected_at] %> ago</td>
+                <td class="py-4 text-[#525252] text-sm time-ago"><%= time_ago_in_words(Time.parse(conn[:connected_at])) rescue '—' %></td>
               </tr>
             <% end %>
             <% if @stats[:connections][:details].empty? %>
@@ -235,39 +252,107 @@
 <script>
   (function() {
     let chartInstance = null
+    let chartInitialized = false
+    const MAX_RETRY_ATTEMPTS = 50  // 5 seconds max wait
+    const RETRY_INTERVAL_MS = 100
 
-    function initEventsChart() {
-      const ctx = document.getElementById('events-chart')
-      if (!ctx) return
+    function showChartError(container, message) {
+      const errorDiv = container.querySelector('.chart-error')
+      if (errorDiv) {
+        errorDiv.textContent = message
+        errorDiv.style.display = 'flex'
+      }
+      const canvas = container.querySelector('canvas')
+      if (canvas) canvas.style.display = 'none'
+    }
 
+    function showChartLoading(container) {
+      const loadingDiv = container.querySelector('.chart-loading')
+      if (loadingDiv) loadingDiv.style.display = 'flex'
+    }
+
+    function hideChartLoading(container) {
+      const loadingDiv = container.querySelector('.chart-loading')
+      if (loadingDiv) loadingDiv.style.display = 'none'
+    }
+
+    function initEventsChart(retryCount = 0) {
+      // Prevent multiple initializations
+      if (chartInitialized && chartInstance) return
+
+      const canvas = document.getElementById('events-chart')
+      if (!canvas) return
+
+      const container = canvas.parentElement
+
+      // Show loading state on first attempt
+      if (retryCount === 0) {
+        showChartLoading(container)
+      }
+
+      // Check if Chart.js is loaded
       if (typeof Chart === 'undefined') {
-        setTimeout(initEventsChart, 100)
+        if (retryCount >= MAX_RETRY_ATTEMPTS) {
+          hideChartLoading(container)
+          showChartError(container, 'Failed to load chart library')
+          console.error('Chart.js failed to load after', MAX_RETRY_ATTEMPTS * RETRY_INTERVAL_MS, 'ms')
+          return
+        }
+        setTimeout(() => initEventsChart(retryCount + 1), RETRY_INTERVAL_MS)
         return
       }
 
+      // Destroy existing chart instance
       if (chartInstance) {
-        chartInstance.destroy()
+        try {
+          chartInstance.destroy()
+        } catch (e) {
+          console.warn('Error destroying chart:', e)
+        }
         chartInstance = null
       }
 
       try {
-        const labelsRaw = ctx.dataset.labels
-        const valuesRaw = ctx.dataset.values
+        const labelsRaw = canvas.dataset.labels
+        const valuesRaw = canvas.dataset.values
 
-        if (!labelsRaw || !valuesRaw) return
+        if (!labelsRaw || !valuesRaw) {
+          hideChartLoading(container)
+          showChartError(container, 'No chart data available')
+          return
+        }
 
-        const labels = JSON.parse(labelsRaw)
-        const values = JSON.parse(valuesRaw)
+        let labels, values
+        try {
+          labels = JSON.parse(labelsRaw)
+          values = JSON.parse(valuesRaw)
+        } catch (parseError) {
+          hideChartLoading(container)
+          showChartError(container, 'Invalid chart data')
+          console.error('Chart data parse error:', parseError)
+          return
+        }
 
-        if (labels.length === 0) return
+        if (!Array.isArray(labels) || !Array.isArray(values) || labels.length === 0) {
+          hideChartLoading(container)
+          showChartError(container, 'No events in the last 7 days')
+          return
+        }
 
         const formattedLabels = labels.map(dateStr => {
-          const [year, month, day] = dateStr.split('-').map(Number)
+          if (!dateStr || typeof dateStr !== 'string') return '?'
+          const parts = dateStr.split('-').map(Number)
+          if (parts.length !== 3) return dateStr
+          const [year, month, day] = parts
           const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
-          return `${months[month - 1]} ${day}`
+          return `${months[month - 1] || '?'} ${day || '?'}`
         })
 
-        chartInstance = new Chart(ctx, {
+        // Ensure canvas is visible and has dimensions
+        canvas.style.display = 'block'
+        hideChartLoading(container)
+
+        chartInstance = new Chart(canvas, {
           type: 'bar',
           data: {
             labels: formattedLabels,
@@ -282,6 +367,9 @@
           options: {
             responsive: true,
             maintainAspectRatio: false,
+            animation: {
+              duration: 400
+            },
             plugins: {
               legend: { display: false },
               tooltip: {
@@ -323,26 +411,55 @@
             }
           }
         })
+
+        chartInitialized = true
+        console.log('Chart initialized successfully')
+
       } catch (e) {
-        console.error('Chart error:', e)
+        hideChartLoading(container)
+        showChartError(container, 'Error rendering chart')
+        console.error('Chart initialization error:', e)
       }
     }
 
     // Update progress bars
-    window.updateProgressBars = function(cpu, memoryMb, dbUsed, dbTotal) {
+    window.updateProgressBars = function(cpu, memoryMb, memoryTotalMb, dbUsed, dbTotal) {
       const cpuBar = document.getElementById('cpu-bar')
       const memoryBar = document.getElementById('memory-bar')
       const dbBar = document.getElementById('db-bar')
 
       if (cpuBar) cpuBar.style.width = Math.min(cpu, 100) + '%'
-      if (memoryBar) memoryBar.style.width = Math.min((memoryMb / 512) * 100, 100) + '%'
+      if (memoryBar && memoryTotalMb > 0) memoryBar.style.width = Math.min((memoryMb / memoryTotalMb) * 100, 100) + '%'
       if (dbBar && dbTotal > 0) dbBar.style.width = (dbUsed / dbTotal * 100) + '%'
     }
 
-    document.addEventListener('DOMContentLoaded', initEventsChart)
-    document.addEventListener('turbo:load', initEventsChart)
-    document.addEventListener('turbo:render', initEventsChart)
+    // Single initialization point - use the most reliable event
+    function safeInit() {
+      // Reset state for fresh initialization (handles Turbo navigation)
+      chartInitialized = false
+      if (chartInstance) {
+        try { chartInstance.destroy() } catch (e) {}
+        chartInstance = null
+      }
+      initEventsChart(0)
+    }
 
-    if (document.readyState !== 'loading') initEventsChart()
+    // Primary: DOMContentLoaded for initial page load
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', safeInit, { once: true })
+    } else {
+      // DOM already loaded
+      safeInit()
+    }
+
+    // Turbo navigation support
+    document.addEventListener('turbo:load', safeInit)
+
+    // Handle visibility changes (tab switching)
+    document.addEventListener('visibilitychange', function() {
+      if (document.visibilityState === 'visible' && !chartInitialized) {
+        safeInit()
+      }
+    })
   })()
 </script>

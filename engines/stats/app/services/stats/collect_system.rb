@@ -23,6 +23,7 @@ module Stats
     def collect_memory
       {
         rss_mb: cached_memory_rss_mb,
+        total_mb: cached_memory_total_mb,
         # GC stats are cheap and should be real-time
         heap_allocated_pages: GC.stat[:heap_allocated_pages],
         total_allocated_objects: GC.stat[:total_allocated_objects]
@@ -35,6 +36,13 @@ module Stats
       end
     end
 
+    def cached_memory_total_mb
+      # Total memory changes rarely, cache longer
+      Rails.cache.fetch("stats:system:memory_total", expires_in: 5.minutes) do
+        memory_total_mb
+      end
+    end
+
     def memory_rss_mb
       # Linux: read from /proc
       if File.exist?("/proc/#{Process.pid}/status")
@@ -44,6 +52,53 @@ module Stats
 
       # macOS/fallback: use ps command
       (`ps -o rss= -p #{Process.pid}`.to_i / 1024.0).round(2)
+    end
+
+    def memory_total_mb
+      # Try container memory limit first (Heroku, Docker, etc.)
+      container_limit = container_memory_limit_mb
+      return container_limit if container_limit
+
+      # Fall back to system total memory
+      system_memory_total_mb
+    end
+
+    def container_memory_limit_mb
+      # cgroup v2 (modern containers)
+      if File.exist?("/sys/fs/cgroup/memory.max")
+        value = File.read("/sys/fs/cgroup/memory.max").strip
+        return nil if value == "max" # No limit set
+        return (value.to_i / 1024.0 / 1024.0).round(0)
+      end
+
+      # cgroup v1 (older containers)
+      if File.exist?("/sys/fs/cgroup/memory/memory.limit_in_bytes")
+        value = File.read("/sys/fs/cgroup/memory/memory.limit_in_bytes").strip.to_i
+        # Check if it's effectively unlimited (very large number)
+        return nil if value > 10_000_000_000_000 # > 10TB means no limit
+        return (value / 1024.0 / 1024.0).round(0)
+      end
+
+      nil
+    rescue StandardError
+      nil
+    end
+
+    def system_memory_total_mb
+      # Linux: read from /proc/meminfo
+      if File.exist?("/proc/meminfo")
+        match = File.read("/proc/meminfo").match(/MemTotal:\s+(\d+)/)
+        return (match[1].to_i / 1024.0).round(0) if match
+      end
+
+      # macOS: use sysctl
+      result = `sysctl -n hw.memsize 2>/dev/null`.strip
+      return (result.to_i / 1024.0 / 1024.0).round(0) if result.present?
+
+      # Default fallback
+      512
+    rescue StandardError
+      512
     end
 
     def collect_cpu
@@ -156,10 +211,36 @@ module Stats
 
     def collect_database
       pool = ActiveRecord::Base.connection_pool
+
+      # Use pool.stat for more reliable metrics (Rails 6.1+)
+      if pool.respond_to?(:stat)
+        stat = pool.stat
+        {
+          pool_size: stat[:size] || pool.size,
+          connections_in_use: stat[:busy] || 0,
+          connections_idle: stat[:idle] || 0,
+          waiting_in_queue: stat[:waiting] || 0,
+          checkout_timeout: stat[:checkout_timeout] || pool.checkout_timeout
+        }
+      else
+        # Fallback for older Rails versions
+        {
+          pool_size: pool.size,
+          connections_in_use: pool.connections.count(&:in_use?),
+          connections_idle: pool.connections.count { |c| !c.in_use? },
+          waiting_in_queue: pool.num_waiting_in_queue,
+          checkout_timeout: pool.checkout_timeout
+        }
+      end
+    rescue StandardError => e
+      Rails.logger.error "[Stats] Failed to collect database stats: #{e.message}"
+      # Return safe defaults
       {
-        pool_size: pool.size,
-        connections_in_use: pool.connections.count(&:in_use?),
-        waiting_in_queue: pool.num_waiting_in_queue
+        pool_size: 5,
+        connections_in_use: 0,
+        connections_idle: 0,
+        waiting_in_queue: 0,
+        checkout_timeout: 5
       }
     end
   end
