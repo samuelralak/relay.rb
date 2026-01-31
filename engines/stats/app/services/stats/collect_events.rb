@@ -2,18 +2,19 @@
 
 module Stats
   class CollectEvents < ::BaseService
-    # Cache TTLs for expensive queries
-    TOTAL_COUNT_CACHE_TTL = 1.minute
+    # Cache TTLs for expensive queries (longer TTLs for production with millions of rows)
+    TOTAL_COUNT_CACHE_TTL = 5.minutes
+    TODAY_COUNT_CACHE_TTL = 1.minute
     PER_MINUTE_CACHE_TTL = 30.seconds
-    BY_KIND_CACHE_TTL = 5.minutes
-    LAST_7_DAYS_CACHE_TTL = 5.minutes
+    BY_KIND_CACHE_TTL = 10.minutes
+    LAST_7_DAYS_CACHE_TTL = 10.minutes
 
     def call
       event_class = Stats.event_class
 
       Success(
         total: cached_total_count(event_class),
-        today: count_received_today(event_class),
+        today: cached_today_count(event_class),
         per_minute: calculate_per_minute(event_class),
         by_kind: count_by_kind(event_class),
         last_7_days: count_last_7_days(event_class)
@@ -27,14 +28,29 @@ module Stats
 
     def cached_total_count(klass)
       Rails.cache.fetch("stats:events:total", expires_in: TOTAL_COUNT_CACHE_TTL) do
-        # paranoia gem adds default scope excluding deleted records
-        klass.count
+        # Use estimated count for large tables (much faster)
+        # Falls back to actual count if estimate unavailable
+        estimated_count(klass) || klass.count
       end
     end
 
-    def count_received_today(klass)
-      # Use first_seen_at: when the relay received the event (not nostr_created_at which is protocol timestamp)
-      klass.where("first_seen_at >= ?", Date.current.beginning_of_day).count
+    def cached_today_count(klass)
+      # Cache key includes date to auto-invalidate at midnight
+      cache_key = "stats:events:today:#{Date.current}"
+      Rails.cache.fetch(cache_key, expires_in: TODAY_COUNT_CACHE_TTL) do
+        klass.where("first_seen_at >= ?", Date.current.beginning_of_day).count
+      end
+    end
+
+    # Use PostgreSQL's table statistics for fast estimated count
+    def estimated_count(klass)
+      result = ActiveRecord::Base.connection.execute(
+        "SELECT reltuples::bigint FROM pg_class WHERE relname = '#{klass.table_name}'"
+      ).first
+      count = result&.dig("reltuples")
+      count&.positive? ? count : nil
+    rescue StandardError
+      nil
     end
 
     def calculate_per_minute(klass)
