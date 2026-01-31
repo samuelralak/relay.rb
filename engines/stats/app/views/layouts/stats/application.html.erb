@@ -202,415 +202,272 @@
 
   <script>
     (function() {
-      const statusDot = document.getElementById('status-dot')
-      const statusText = document.getElementById('status-text')
+      'use strict';
 
-      function setConnected() {
-        if (statusDot) statusDot.className = 'w-2 h-2 rounded-full bg-emerald-500'
-        if (statusText) {
-          statusText.textContent = 'Live'
-          statusText.className = 'text-sm text-emerald-500 font-medium'
+      // ===================
+      // Formatting Utilities
+      // ===================
+
+      const Format = {
+        number(num) {
+          if (num >= 1e6) return (num / 1e6).toFixed(1) + 'M';
+          if (num >= 1e3) return (num / 1e3).toFixed(1) + 'K';
+          return new Intl.NumberFormat().format(num);
+        },
+
+        duration(seconds) {
+          const d = Math.floor(seconds / 86400);
+          const h = Math.floor((seconds % 86400) / 3600);
+          const m = Math.floor((seconds % 3600) / 60);
+          if (d > 0) return `${d}d ${h}h`;
+          if (h > 0) return `${h}h ${m}m`;
+          return `${m}m`;
+        },
+
+        timeAgo(isoString) {
+          if (!isoString) return '—';
+          const date = new Date(isoString);
+          if (isNaN(date.getTime())) return '—';
+          const secs = Math.floor((Date.now() - date) / 1000);
+          if (secs < 60) return 'now';
+          const mins = Math.floor(secs / 60);
+          if (mins < 60) return `${mins}m`;
+          const hours = Math.floor(mins / 60);
+          if (hours < 24) return `${hours}h`;
+          return `${Math.floor(hours / 24)}d`;
+        },
+
+        escapeHtml(str) {
+          if (str == null) return '';
+          const div = document.createElement('div');
+          div.textContent = str;
+          return div.innerHTML;
         }
-      }
+      };
 
-      function setDisconnected() {
-        if (statusDot) statusDot.className = 'w-2 h-2 rounded-full bg-red-500'
-        if (statusText) {
-          statusText.textContent = 'Offline'
-          statusText.className = 'text-sm text-red-500'
+      // ===================
+      // Status Indicator
+      // ===================
+
+      const Status = {
+        dot: document.getElementById('status-dot'),
+        text: document.getElementById('status-text'),
+
+        setLive() {
+          if (this.dot) this.dot.className = 'w-2 h-2 rounded-full bg-emerald-500';
+          if (this.text) {
+            this.text.textContent = 'Live';
+            this.text.className = 'text-sm text-emerald-500 font-medium';
+          }
+        },
+
+        setConnecting() {
+          if (this.dot) this.dot.className = 'w-2 h-2 rounded-full bg-amber-500 animate-pulse';
+          if (this.text) {
+            this.text.textContent = 'Connecting';
+            this.text.className = 'text-sm text-amber-500';
+          }
         }
-      }
+      };
 
-      function setPolling() {
-        if (statusDot) statusDot.className = 'w-2 h-2 rounded-full bg-amber-500'
-        if (statusText) {
-          statusText.textContent = 'Polling'
-          statusText.className = 'text-sm text-amber-500'
-        }
-      }
+      // ===================
+      // DOM Updates
+      // ===================
 
-      // Track previous values to only highlight actual changes
-      const previousValues = new Map()
+      const prevValues = new Map();
 
       function updateElement(id, value) {
-        const el = document.getElementById(id)
-        if (!el) return
+        const el = document.getElementById(id);
+        if (!el) return;
 
-        const stringValue = String(value)
-        const previousValue = previousValues.get(id)
+        const str = String(value);
+        const prev = prevValues.get(id);
+        if (prev === str) return;
 
-        // Only update if value actually changed
-        if (previousValue === stringValue) return
+        prevValues.set(id, str);
+        el.textContent = str;
 
-        previousValues.set(id, stringValue)
-        el.textContent = stringValue
-
-        // Only show highlight animation when value changes (not on first load)
-        if (previousValue !== undefined) {
-          el.setAttribute('data-updating', 'true')
-          setTimeout(() => el.removeAttribute('data-updating'), 400)
+        if (prev !== undefined) {
+          el.setAttribute('data-updating', 'true');
+          setTimeout(() => el.removeAttribute('data-updating'), 400);
         }
       }
 
-      function formatNumber(num) {
-        if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M'
-        if (num >= 1000) return (num / 1000).toFixed(1) + 'K'
-        return new Intl.NumberFormat().format(num)
-      }
+      // ===================
+      // Connections Table
+      // ===================
 
-      function formatDuration(seconds) {
-        const days = Math.floor(seconds / 86400)
-        const hours = Math.floor((seconds % 86400) / 3600)
-        const mins = Math.floor((seconds % 3600) / 60)
-        if (days > 0) return `${days}d ${hours}h`
-        if (hours > 0) return `${hours}h ${mins}m`
-        return `${mins}m`
-      }
+      const ConnectionsTable = {
+        data: [],
+        page: 1,
+        perPage: 10,
+        prevFingerprint: '',
 
-      function formatTimeAgo(isoString) {
-        if (!isoString) return '—'
-        const date = new Date(isoString)
-        if (isNaN(date.getTime())) return '—'
-        const seconds = Math.floor((new Date() - date) / 1000)
-        if (seconds < 0) return 'now' // Future dates (clock skew)
-        if (seconds < 60) return 'now'
-        const mins = Math.floor(seconds / 60)
-        if (mins < 60) return `${mins}m`
-        const hours = Math.floor(mins / 60)
-        if (hours < 24) return `${hours}h`
-        return `${Math.floor(hours / 24)}d`
-      }
+        update(connections) {
+          const fp = connections.map(c =>
+            `${c.id}:${c.subscription_count}:${c.authenticated_pubkeys?.length || 0}`
+          ).join('|');
 
-      // Escape HTML to prevent XSS attacks
-      function escapeHtml(str) {
-        if (str === null || str === undefined) return ''
-        const div = document.createElement('div')
-        div.textContent = str
-        return div.innerHTML
-      }
-
-      let allConnections = []
-      let currentPage = 1
-      let perPage = 10
-      // Track connection IDs for smart diffing
-      let previousConnectionIds = []
-
-      function updateConnectionsTable(connections) {
-        // Check if connections actually changed before re-rendering
-        const newIds = connections.map(c => c.id).join(',')
-        const oldIds = previousConnectionIds.join(',')
-
-        // Also check subscription counts and other mutable fields
-        const newFingerprint = connections.map(c => `${c.id}:${c.subscription_count}:${c.authenticated_pubkeys?.length || 0}`).join('|')
-        const oldFingerprint = allConnections.map(c => `${c.id}:${c.subscription_count}:${c.authenticated_pubkeys?.length || 0}`).join('|')
-
-        if (newFingerprint === oldFingerprint && newIds === oldIds) {
-          // Only update "time ago" fields without full re-render
-          updateConnectionTimes()
-          return
-        }
-
-        previousConnectionIds = connections.map(c => c.id)
-        allConnections = connections
-        renderConnectionsPage()
-      }
-
-      // Update only the time-ago cells without full re-render
-      function updateConnectionTimes() {
-        const rows = document.querySelectorAll('#connections-tbody tr[data-connection-id]')
-        rows.forEach(row => {
-          const connId = row.getAttribute('data-connection-id')
-          const conn = allConnections.find(c => c.id === connId)
-          if (conn) {
-            const timeCell = row.querySelector('.time-ago')
-            if (timeCell) {
-              const newTime = formatTimeAgo(conn.connected_at)
-              if (timeCell.textContent !== newTime) {
-                timeCell.textContent = newTime
-              }
-            }
+          if (fp === this.prevFingerprint) {
+            this.updateTimes();
+            return;
           }
-        })
-      }
 
-      function renderConnectionsPage() {
-        const tbody = document.getElementById('connections-tbody')
-        if (!tbody) return
+          this.prevFingerprint = fp;
+          this.data = connections;
+          this.render();
+        },
 
-        const total = allConnections.length
-        const totalPages = Math.ceil(total / perPage)
-        currentPage = Math.min(currentPage, Math.max(1, totalPages))
+        updateTimes() {
+          document.querySelectorAll('#connections-tbody tr[data-connection-id]').forEach(row => {
+            const conn = this.data.find(c => c.id === row.dataset.connectionId);
+            if (!conn) return;
+            const cell = row.querySelector('.time-ago');
+            if (cell) cell.textContent = Format.timeAgo(conn.connected_at);
+          });
+        },
 
-        const start = (currentPage - 1) * perPage
-        const end = Math.min(start + perPage, total)
-        const pageConnections = allConnections.slice(start, end)
+        render() {
+          const tbody = document.getElementById('connections-tbody');
+          if (!tbody) return;
 
-        const totalEl = document.getElementById('connections-total')
-        if (totalEl && totalEl.textContent !== String(total)) {
-          totalEl.textContent = total
-        }
+          const total = this.data.length;
+          const maxPage = Math.max(1, Math.ceil(total / this.perPage));
+          this.page = Math.min(this.page, maxPage);
 
-        if (total === 0) {
-          tbody.innerHTML = `
-            <tr>
-              <td colspan="5" class="py-16 text-center text-[#525252]">No active connections</td>
-            </tr>
-          `
-          updatePaginationControls(0, 0, 0)
-          return
-        }
+          const start = (this.page - 1) * this.perPage;
+          const pageData = this.data.slice(start, start + this.perPage);
 
-        // Build new rows
-        const newHtml = pageConnections.map(conn => `
-          <tr class="table-row border-t border-[#1f1f1f]" data-connection-id="${escapeHtml(conn.id)}">
-            <td class="py-4 font-mono text-sm text-[#a3a3a3]">${escapeHtml(conn.id?.substring(0, 12) || '')}</td>
-            <td class="py-4 text-[#a3a3a3]">${escapeHtml(conn.ip_address) || '—'}</td>
-            <td class="py-4">
-              <span class="pill ${conn.authenticated_pubkeys?.length > 0 ? 'pill-green' : 'pill-neutral'}">${conn.authenticated_pubkeys?.length > 0 ? conn.authenticated_pubkeys.length + ' pubkey' + (conn.authenticated_pubkeys.length > 1 ? 's' : '') : 'Anonymous'}</span>
-            </td>
-            <td class="py-4">
-              <span class="pill pill-purple">${Number(conn.subscription_count) || 0}</span>
-            </td>
-            <td class="py-4 text-[#525252] text-sm time-ago">${formatTimeAgo(conn.connected_at)}</td>
-          </tr>
-        `).join('')
+          const totalEl = document.getElementById('connections-total');
+          if (totalEl) totalEl.textContent = total;
 
-        tbody.innerHTML = newHtml
-        updatePaginationControls(start + 1, end, total)
-      }
-
-      function updatePaginationControls(start, end, total) {
-        const pagination = document.getElementById('connections-pagination')
-        const prevBtn = document.getElementById('pagination-prev')
-        const nextBtn = document.getElementById('pagination-next')
-        const startEl = document.getElementById('pagination-start')
-        const endEl = document.getElementById('pagination-end')
-        const totalEl = document.getElementById('pagination-total')
-
-        if (!pagination) return
-        pagination.classList.toggle('hidden', total <= perPage)
-
-        if (startEl && startEl.textContent !== String(start)) startEl.textContent = start
-        if (endEl && endEl.textContent !== String(end)) endEl.textContent = end
-        if (totalEl && totalEl.textContent !== String(total)) totalEl.textContent = total
-        if (prevBtn) prevBtn.disabled = currentPage <= 1
-        if (nextBtn) nextBtn.disabled = currentPage >= Math.ceil(total / perPage)
-      }
-
-      function setupPaginationListeners() {
-        const prevBtn = document.getElementById('pagination-prev')
-        const nextBtn = document.getElementById('pagination-next')
-        const perPageSelect = document.getElementById('connections-per-page')
-
-        if (prevBtn) {
-          prevBtn.addEventListener('click', function() {
-            if (currentPage > 1) { currentPage--; renderConnectionsPage() }
-          })
-        }
-        if (nextBtn) {
-          nextBtn.addEventListener('click', function() {
-            if (currentPage < Math.ceil(allConnections.length / perPage)) { currentPage++; renderConnectionsPage() }
-          })
-        }
-        if (perPageSelect) {
-          perPageSelect.addEventListener('change', function(e) {
-            perPage = parseInt(e.target.value, 10)
-            currentPage = 1
-            renderConnectionsPage()
-          })
-        }
-      }
-
-      // Build WebSocket URL properly
-      function getWebSocketUrl() {
-        const meta = document.querySelector('meta[name="action-cable-url"]')
-        if (meta && meta.content) {
-          const cableUrl = meta.content
-          // If it's already a full URL, convert protocol
-          if (cableUrl.startsWith('http')) {
-            return cableUrl.replace(/^http/, 'ws')
+          if (total === 0) {
+            tbody.innerHTML = '<tr><td colspan="5" class="py-16 text-center text-[#525252]">No active connections</td></tr>';
+          } else {
+            tbody.innerHTML = pageData.map(c => `
+              <tr class="table-row border-t border-[#1f1f1f]" data-connection-id="${Format.escapeHtml(c.id)}">
+                <td class="py-4 font-mono text-sm text-[#a3a3a3]">${Format.escapeHtml(c.id?.substring(0, 12) || '')}</td>
+                <td class="py-4 text-[#a3a3a3]">${Format.escapeHtml(c.ip_address) || '—'}</td>
+                <td class="py-4"><span class="pill ${c.authenticated_pubkeys?.length ? 'pill-green' : 'pill-neutral'}">${c.authenticated_pubkeys?.length ? c.authenticated_pubkeys.length + ' pubkey' + (c.authenticated_pubkeys.length > 1 ? 's' : '') : 'Anonymous'}</span></td>
+                <td class="py-4"><span class="pill pill-purple">${c.subscription_count || 0}</span></td>
+                <td class="py-4 text-[#525252] text-sm time-ago">${Format.timeAgo(c.connected_at)}</td>
+              </tr>
+            `).join('');
           }
-          // If it's a relative path, build full URL
-          const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-          const host = window.location.host
-          return `${protocol}//${host}${cableUrl}`
+
+          this.updatePagination(total);
+        },
+
+        updatePagination(total) {
+          const el = id => document.getElementById(id);
+          const pagination = el('connections-pagination');
+          if (!pagination) return;
+
+          const start = (this.page - 1) * this.perPage + 1;
+          const end = Math.min(start + this.perPage - 1, total);
+
+          pagination.classList.toggle('hidden', total <= this.perPage);
+          if (el('pagination-start')) el('pagination-start').textContent = total ? start : 0;
+          if (el('pagination-end')) el('pagination-end').textContent = total ? end : 0;
+          if (el('pagination-total')) el('pagination-total').textContent = total;
+          if (el('pagination-prev')) el('pagination-prev').disabled = this.page <= 1;
+          if (el('pagination-next')) el('pagination-next').disabled = this.page >= Math.ceil(total / this.perPage);
+        },
+
+        setupListeners() {
+          document.getElementById('pagination-prev')?.addEventListener('click', () => {
+            if (this.page > 1) { this.page--; this.render(); }
+          });
+          document.getElementById('pagination-next')?.addEventListener('click', () => {
+            if (this.page < Math.ceil(this.data.length / this.perPage)) { this.page++; this.render(); }
+          });
+          document.getElementById('connections-per-page')?.addEventListener('change', e => {
+            this.perPage = parseInt(e.target.value, 10);
+            this.page = 1;
+            this.render();
+          });
         }
-        // Default fallback
-        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-        return `${protocol}//${window.location.host}/cable`
-      }
+      };
 
-      class StatsConnection {
-        constructor() {
-          this.wsConnected = false
-          this.pollInterval = null
-          this.lastUpdateTime = 0
-          this.updateDebounceMs = 1000 // Minimum 1 second between updates
-          this.connect()
-        }
+      // ===================
+      // Stats Poller
+      // ===================
 
-        connect() {
-          const wsUrl = getWebSocketUrl()
-          console.log('Connecting to:', wsUrl)
+      const Poller = {
+        interval: null,
 
+        start() {
+          if (this.interval) return;
+          Status.setConnecting();
+          this.fetch();
+          this.interval = setInterval(() => this.fetch(), 5000);
+        },
+
+        async fetch() {
           try {
-            this.ws = new WebSocket(wsUrl)
+            const res = await fetch('<%= api_metrics_path %>');
+            if (!res.ok) return;
 
-            this.ws.onopen = () => {
-              console.log('WebSocket connected')
-              this.subscribe()
-            }
+            const data = await res.json();
+            if (!data?.connections || !data?.events || !data?.system) return;
 
-            this.ws.onmessage = (event) => {
-              let data
-              try {
-                data = JSON.parse(event.data)
-              } catch (e) {
-                console.error('Failed to parse WebSocket message:', e)
-                return
-              }
-              if (data.type === 'ping') return
-              if (data.type === 'welcome') return
-              if (data.type === 'confirm_subscription') {
-                console.log('Subscription confirmed')
-                this.wsConnected = true
-                setConnected()
-                // Stop polling when WebSocket is confirmed
-                this.stopPolling()
-                return
-              }
-              if (data.message) this.handleMessage(data.message)
-            }
-
-            this.ws.onclose = (event) => {
-              console.log('WebSocket closed:', event.code, event.reason)
-              this.wsConnected = false
-              setDisconnected()
-              // Start polling as fallback when WebSocket disconnects
-              this.startPolling()
-              setTimeout(() => this.connect(), 3000)
-            }
-
-            this.ws.onerror = (error) => {
-              console.error('WebSocket error:', error)
-              this.wsConnected = false
-              setDisconnected()
-              // Start polling as fallback on error
-              this.startPolling()
-            }
-          } catch (error) {
-            console.error('Failed to create WebSocket:', error)
-            this.wsConnected = false
-            setDisconnected()
-            // Start polling as fallback
-            this.startPolling()
+            Status.setLive();
+            this.update(data);
+          } catch (e) {
+            console.error('Stats fetch error:', e);
           }
-        }
+        },
 
-        subscribe() {
-          this.ws.send(JSON.stringify({
-            command: 'subscribe',
-            identifier: JSON.stringify({ channel: 'Stats::MetricsChannel' })
-          }))
-        }
+        update(data) {
+          // Stats cards
+          updateElement('stat-connections', Format.number(data.connections.total));
+          updateElement('stat-subscriptions', Format.number(data.connections.total_subscriptions));
+          updateElement('stat-events-total', Format.number(data.events.total));
+          updateElement('stat-events-today', Format.number(data.events.today));
+          updateElement('stat-events-per-min', data.events.per_minute.toFixed(1));
 
-        // Polling fallback - only runs when WebSocket is not connected
-        startPolling() {
-          if (this.pollInterval) return // Already polling
-          console.log('Starting polling fallback')
-          setPolling()
-          // Poll every 5 seconds as backup
-          this.pollInterval = setInterval(() => {
-            if (!this.wsConnected) {
-              this.poll()
-            }
-          }, 5000)
-          // Also poll immediately
-          this.poll()
-        }
+          // System stats
+          updateElement('stat-memory', data.system.memory.rss_mb);
+          updateElement('stat-memory-panel', data.system.memory.rss_mb);
+          updateElement('stat-memory-total', data.system.memory.total_mb);
+          updateElement('stat-cpu', data.system.cpu.load_percent);
+          updateElement('stat-load-avg', data.system.cpu.load_average);
+          updateElement('stat-threads', data.system.process.thread_count);
+          updateElement('stat-uptime', Format.duration(data.system.process.uptime_seconds));
+          updateElement('stat-db-pool', `${data.system.database.connections_in_use}/${data.system.database.pool_size}`);
 
-        stopPolling() {
-          if (this.pollInterval) {
-            console.log('Stopping polling - WebSocket connected')
-            clearInterval(this.pollInterval)
-            this.pollInterval = null
-          }
-        }
+          // Progress bars
+          window.updateProgressBars?.(
+            data.system.cpu.load_percent,
+            data.system.memory.rss_mb,
+            data.system.memory.total_mb,
+            data.system.database.connections_in_use,
+            data.system.database.pool_size
+          );
 
-        async poll() {
-          if (this.wsConnected) return // Don't poll if WebSocket is connected
-
-          try {
-            const response = await fetch('<%= api_metrics_path %>')
-            if (response.ok) {
-              const data = await response.json()
-              this.handleMessage(data)
-              if (!this.wsConnected) {
-                setPolling()
-              }
-            } else {
-              console.warn('Poll returned non-OK status:', response.status)
-            }
-          } catch (error) {
-            console.error('Poll error:', error)
-          }
-        }
-
-        handleMessage(data) {
-          if (data.error) {
-            console.error('Stats error:', data.error)
-            return
+          // Connections table
+          if (Array.isArray(data.connections.details)) {
+            ConnectionsTable.update(data.connections.details);
           }
 
-          // Debounce updates to prevent rapid flickering
-          const now = Date.now()
-          if (now - this.lastUpdateTime < this.updateDebounceMs) {
-            return
+          // Timestamp
+          if (data.collected_at) {
+            updateElement('last-updated', new Date(data.collected_at).toLocaleTimeString());
           }
-          this.lastUpdateTime = now
-
-          updateElement('stat-connections', formatNumber(data.connections.total))
-          updateElement('stat-subscriptions', formatNumber(data.connections.total_subscriptions))
-          updateElement('stat-events-total', formatNumber(data.events.total))
-          updateElement('stat-events-today', formatNumber(data.events.today))
-          updateElement('stat-events-per-min', data.events.per_minute.toFixed(1))
-          updateElement('stat-memory', data.system.memory.rss_mb)
-          updateElement('stat-memory-panel', data.system.memory.rss_mb)
-          updateElement('stat-memory-total', data.system.memory.total_mb)
-          updateElement('stat-cpu', data.system.cpu.load_percent)
-          updateElement('stat-load-avg', data.system.cpu.load_average)
-          updateElement('stat-threads', data.system.process.thread_count)
-          updateElement('stat-uptime', formatDuration(data.system.process.uptime_seconds))
-          updateElement('stat-db-pool', data.system.database.connections_in_use + '/' + data.system.database.pool_size)
-
-          // Update progress bars
-          if (window.updateProgressBars) {
-            window.updateProgressBars(
-              data.system.cpu.load_percent,
-              data.system.memory.rss_mb,
-              data.system.memory.total_mb,
-              data.system.database.connections_in_use,
-              data.system.database.pool_size
-            )
-          }
-
-          updateConnectionsTable(data.connections.details)
-
-          const timestamp = new Date(data.collected_at)
-          updateElement('last-updated', timestamp.toLocaleTimeString())
         }
-      }
+      };
 
-      // Initialize when DOM is ready
-      document.addEventListener('DOMContentLoaded', function() {
-        setupPaginationListeners()
+      // ===================
+      // Initialize
+      // ===================
 
-        // Start WebSocket connection if on dashboard
+      document.addEventListener('DOMContentLoaded', () => {
+        ConnectionsTable.setupListeners();
         if (document.getElementById('stats-dashboard')) {
-          new StatsConnection()
+          Poller.start();
         }
-      })
-    })()
+      });
+    })();
   </script>
 </body>
 </html>

@@ -190,6 +190,21 @@ module ActiveRecord
     def num_waiting_in_queue
       0
     end
+
+    def checkout_timeout
+      5
+    end
+
+    # Rails 6.1+ pool.stat method
+    def stat
+      {
+        size: 10,
+        busy: 1,
+        idle: 9,
+        waiting: 0,
+        checkout_timeout: 5
+      }
+    end
   end
 
   class MockConnection
