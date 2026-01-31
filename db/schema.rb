@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_01_25_195342) do
+ActiveRecord::Schema[8.1].define(version: 2026_01_31_202113) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pgcrypto"
@@ -66,6 +66,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_01_25_195342) do
     t.index ["deleted_at"], name: "idx_events_deleted_at"
     t.index ["event_id"], name: "idx_events_event_id", unique: true
     t.index ["expires_at"], name: "idx_events_expires_at", where: "(expires_at IS NOT NULL)"
+    t.index ["first_seen_at"], name: "idx_events_first_seen_at"
     t.index ["kind", "nostr_created_at"], name: "idx_events_kind_created_at", order: { nostr_created_at: :desc }
     t.index ["pubkey", "kind", "d_tag"], name: "idx_events_addressable", where: "(d_tag IS NOT NULL)"
     t.index ["pubkey", "kind"], name: "idx_events_pubkey_kind"
