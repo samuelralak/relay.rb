@@ -3,6 +3,11 @@
 
 # Production schedules - optimized for stability and efficiency
 production:
+  # Stats dashboard broadcast - pushes metrics to connected dashboard clients
+  stats_broadcast:
+    class: Stats::BroadcastMetricsJob
+    schedule: every 5 seconds
+
   # Housekeeping - clear finished Solid Queue jobs
   clear_solid_queue_finished_jobs:
     command: "SolidQueue::Job.clear_finished_in_batches(sleep_between_batches: 0.3)"
@@ -46,6 +51,11 @@ production:
 
 # Development schedules - more frequent for testing
 development:
+  # Stats dashboard broadcast
+  stats_broadcast:
+    class: Stats::BroadcastMetricsJob
+    schedule: every 5 seconds
+
   # Real-time sync every 2 minutes
   realtime_sync:
     class: Sync::OrchestratorJob

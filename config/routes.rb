@@ -20,6 +20,9 @@ Rails.application.routes.draw do
     end
   end
 
+  # Stats dashboard engine
+  mount Stats::Engine, at: "/stats"
+
   # Defines the root path route ("/")
   # root "posts#index"
 end
