@@ -15,6 +15,13 @@ RELAYS = [
     direction: UpstreamRelays::Directions::DOWN
   },
   {
+    url: "wss://nostr.oxtr.dev",
+    enabled: true,
+    backfill: true,
+    negentropy: true,
+    direction: UpstreamRelays::Directions::DOWN
+  },
+  {
     url: "wss://relay.primal.net",
     enabled: true,
     backfill: true,
