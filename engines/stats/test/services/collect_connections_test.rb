@@ -12,7 +12,7 @@ module Stats
           id: "uuid-1",
           ip_address: "192.168.1.1",
           connected_at: Time.now,
-          authenticated_pubkeys: ["pubkey1"],
+          authenticated_pubkeys: [ "pubkey1" ],
           subscription_count: 3
         },
         {

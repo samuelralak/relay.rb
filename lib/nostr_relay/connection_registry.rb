@@ -52,7 +52,7 @@ module NostrRelay
 
         connections.map do |id, conn|
           {
-            id: id,
+            id:,
             ip_address: conn.ip_address,
             connected_at: conn.connected_at.iso8601,
             authenticated_pubkeys: conn.authenticated_pubkeys.to_a,

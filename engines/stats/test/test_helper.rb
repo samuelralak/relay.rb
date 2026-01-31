@@ -184,7 +184,7 @@ module ActiveRecord
     end
 
     def connections
-      [MockConnection.new(true), MockConnection.new(false)]
+      [ MockConnection.new(true), MockConnection.new(false) ]
     end
 
     def num_waiting_in_queue

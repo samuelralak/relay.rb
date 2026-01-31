@@ -10,9 +10,9 @@ module Stats
       system = yield CollectSystem.call
 
       Success(
-        connections: connections,
-        events: events,
-        system: system,
+        connections:,
+        events:,
+        system:,
         collected_at: Time.current.iso8601
       )
     rescue StandardError => e

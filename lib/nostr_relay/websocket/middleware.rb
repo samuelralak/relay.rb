@@ -35,9 +35,9 @@ module NostrRelay
         is_websocket = Faye::WebSocket.websocket?(env)
         # Use exact match or path prefix with slash to avoid matching unintended routes
         # e.g., /cable matches but /cableway does not
-        is_excluded = EXCLUDED_PATHS.any? do |path|
+        is_excluded = EXCLUDED_PATHS.any? { |path|
           request_path == path || request_path.start_with?("#{path}/")
-        end
+        }
 
         # Only handle WebSocket connections that are NOT for excluded paths (like ActionCable)
         if is_websocket && !is_excluded
