@@ -27,12 +27,22 @@ module NostrRelay
         @app = app
       end
 
-      def call(env)
-        is_websocket = Faye::WebSocket.websocket?(env)
+      # Paths that should NOT be handled by Nostr WebSocket (e.g., ActionCable)
+      EXCLUDED_PATHS = %w[/cable].freeze
 
-        if is_websocket
+      def call(env)
+        request_path = env["PATH_INFO"]
+        is_websocket = Faye::WebSocket.websocket?(env)
+        # Use exact match or path prefix with slash to avoid matching unintended routes
+        # e.g., /cable matches but /cableway does not
+        is_excluded = EXCLUDED_PATHS.any? do |path|
+          request_path == path || request_path.start_with?("#{path}/")
+        end
+
+        # Only handle WebSocket connections that are NOT for excluded paths (like ActionCable)
+        if is_websocket && !is_excluded
           ws = Faye::WebSocket.new(env, nil, websocket_options)
-          connection = NostrRelay::Connection.new(ws)
+          connection = NostrRelay::Connection.new(ws, env)
 
           ws.on :open do |_event|
             execute_async { connection.on_open }

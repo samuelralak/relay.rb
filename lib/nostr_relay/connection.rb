@@ -16,14 +16,16 @@ module NostrRelay
       end
     end
 
-    attr_reader :id, :challenge, :authenticated_pubkeys
+    attr_reader :id, :challenge, :authenticated_pubkeys, :ip_address, :connected_at
 
-    def initialize(websocket)
+    def initialize(websocket, env = {})
       @ws = websocket
       @id = SecureRandom.uuid
       @send_mutex = Mutex.new
       @challenge = nil
       @authenticated_pubkeys = Set.new
+      @ip_address = extract_ip_address(env)
+      @connected_at = Time.current
     end
 
     def on_open
@@ -121,6 +123,17 @@ module NostrRelay
         send_auth(@challenge)
         tagged_logger.debug "AUTH challenge sent", id: @id
       end
+    end
+
+    # Extract client IP address from Rack env
+    # @param env [Hash] Rack environment
+    # @return [String, nil] IP address or nil if not found
+    def extract_ip_address(env)
+      return nil if env.empty?
+
+      env["HTTP_X_FORWARDED_FOR"]&.split(",")&.first&.strip ||
+        env["HTTP_X_REAL_IP"] ||
+        env["REMOTE_ADDR"]
     end
 
     def tagged_logger

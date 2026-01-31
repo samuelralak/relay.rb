@@ -43,6 +43,24 @@ module NostrRelay
         connections.size
       end
 
+      # Get details for all connections (for stats dashboard)
+      # Uses batch subscription count to avoid N+1 lookups
+      # Note: connected_at is serialized to ISO8601 for JSON compatibility
+      # @return [Array<Hash>] connection details
+      def connection_details
+        sub_counts = Subscriptions.all_subscription_counts
+
+        connections.map do |id, conn|
+          {
+            id: id,
+            ip_address: conn.ip_address,
+            connected_at: conn.connected_at.iso8601,
+            authenticated_pubkeys: conn.authenticated_pubkeys.to_a,
+            subscription_count: sub_counts[id] || 0
+          }
+        end
+      end
+
       # Reset all connections (for testing)
       def reset!
         @connections = Concurrent::Hash.new

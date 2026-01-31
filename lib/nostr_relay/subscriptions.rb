@@ -124,6 +124,28 @@ module NostrRelay
         ConnectionRegistry.connection_count
       end
 
+      # Get subscription count for a connection (for stats dashboard)
+      # Uses key? check to avoid creating empty entry via default block
+      # @param connection_id [String]
+      # @return [Integer]
+      def subscription_count_for(connection_id)
+        return 0 unless subscriptions.key?(connection_id)
+        subscriptions[connection_id].size
+      end
+
+      # Get total subscription count across all connections (for stats dashboard)
+      # @return [Integer]
+      def total_subscription_count
+        subscriptions.values.sum(&:size)
+      end
+
+      # Get subscription counts for all connections at once (for stats dashboard)
+      # Avoids N+1 when collecting connection details
+      # @return [Hash<String, Integer>] connection_id => count
+      def all_subscription_counts
+        subscriptions.transform_values(&:size)
+      end
+
       private
 
       # Broadcast to local subscribers only (used by both local and remote broadcasts)
