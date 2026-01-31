@@ -1,0 +1,348 @@
+<div id="stats-dashboard" class="space-y-8">
+  <% if @stats[:error] %>
+    <div class="card px-6 py-5 border-l-4 border-l-red-500">
+      <p class="text-red-400 font-medium mb-1">Unable to load stats</p>
+      <p class="text-sm text-[#525252]"><%= @stats[:error] %></p>
+    </div>
+  <% else %>
+    <!-- Hero Stats Row -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <!-- Connections Card -->
+      <div class="card p-6">
+        <div class="flex items-center justify-between mb-4">
+          <span class="text-[#737373] text-sm font-medium">Connections</span>
+          <div class="w-8 h-8 rounded-lg bg-purple-500/10 flex items-center justify-center">
+            <svg class="w-4 h-4 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+            </svg>
+          </div>
+        </div>
+        <div id="stat-connections" class="text-3xl font-semibold tracking-tight" data-updating="false"><%= @stats[:connections][:total] %></div>
+        <div class="flex items-center gap-2 mt-2">
+          <span class="text-[#525252] text-sm">Active clients</span>
+        </div>
+      </div>
+
+      <!-- Subscriptions Card -->
+      <div class="card p-6">
+        <div class="flex items-center justify-between mb-4">
+          <span class="text-[#737373] text-sm font-medium">Subscriptions</span>
+          <div class="w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center">
+            <svg class="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.14 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0"/>
+            </svg>
+          </div>
+        </div>
+        <div id="stat-subscriptions" class="text-3xl font-semibold tracking-tight" data-updating="false"><%= @stats[:connections][:total_subscriptions] %></div>
+        <div class="flex items-center gap-2 mt-2">
+          <span class="text-[#525252] text-sm">Active REQ filters</span>
+        </div>
+      </div>
+
+      <!-- Events Today Card -->
+      <div class="card p-6">
+        <div class="flex items-center justify-between mb-4">
+          <span class="text-[#737373] text-sm font-medium">Events Today</span>
+          <div class="w-8 h-8 rounded-lg bg-green-500/10 flex items-center justify-center">
+            <svg class="w-4 h-4 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+            </svg>
+          </div>
+        </div>
+        <div id="stat-events-today" class="text-3xl font-semibold tracking-tight" data-updating="false"><%= number_with_delimiter(@stats[:events][:today]) %></div>
+        <div class="flex items-center gap-2 mt-2">
+          <span class="text-[#525252] text-sm">Received since midnight</span>
+        </div>
+      </div>
+
+      <!-- Throughput Card -->
+      <div class="card p-6">
+        <div class="flex items-center justify-between mb-4">
+          <span class="text-[#737373] text-sm font-medium">Throughput</span>
+          <div class="w-8 h-8 rounded-lg bg-orange-500/10 flex items-center justify-center">
+            <svg class="w-4 h-4 text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/>
+            </svg>
+          </div>
+        </div>
+        <div class="flex items-baseline gap-1">
+          <span id="stat-events-per-min" class="text-3xl font-semibold tracking-tight" data-updating="false"><%= @stats[:events][:per_minute] %></span>
+          <span class="text-[#525252] text-sm">/min</span>
+        </div>
+        <div class="flex items-center gap-2 mt-2">
+          <span class="text-[#525252] text-sm">5-minute average</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Main Content Grid -->
+    <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
+      <!-- Events Chart - Takes 2 columns -->
+      <div class="xl:col-span-2 card p-4 sm:p-6">
+        <div class="flex items-center justify-between mb-6">
+          <div>
+            <h2 class="text-base font-semibold">Event Activity</h2>
+            <p class="text-[#525252] text-sm mt-1">Last 7 days</p>
+          </div>
+          <div class="text-right">
+            <div id="stat-events-total" class="text-2xl font-semibold" data-updating="false"><%= number_with_delimiter(@stats[:events][:total]) %></div>
+            <p class="text-[#525252] text-sm">Total stored</p>
+          </div>
+        </div>
+        <% if @stats[:events][:last_7_days].present? %>
+          <div style="height: 240px;">
+            <canvas id="events-chart"
+                    data-labels="<%= @stats[:events][:last_7_days].keys.to_json %>"
+                    data-values="<%= @stats[:events][:last_7_days].values.to_json %>">
+            </canvas>
+          </div>
+        <% else %>
+          <div class="flex items-center justify-center h-60 text-[#525252]">
+            No events in the last 7 days
+          </div>
+        <% end %>
+      </div>
+
+      <!-- System Resources Panel -->
+      <div class="card p-4 sm:p-6">
+        <h2 class="text-base font-semibold mb-6">System Resources</h2>
+
+        <!-- CPU Gauge -->
+        <div class="mb-6">
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-[#737373] text-sm">CPU Usage</span>
+            <span class="text-sm font-medium"><span id="stat-cpu" data-updating="false"><%= @stats[:system][:cpu][:load_percent] %></span>%</span>
+          </div>
+          <div class="h-2 bg-[#1f1f1f] rounded-full overflow-hidden">
+            <div id="cpu-bar" class="h-full bg-purple-500 rounded-full transition-all duration-500" style="width: <%= [@stats[:system][:cpu][:load_percent], 100].min %>%"></div>
+          </div>
+        </div>
+
+        <!-- Memory Gauge -->
+        <div class="mb-6">
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-[#737373] text-sm">Memory (RSS)</span>
+            <span class="text-sm font-medium"><span id="stat-memory-panel" data-updating="false"><%= @stats[:system][:memory][:rss_mb] %></span> MB</span>
+          </div>
+          <div class="h-2 bg-[#1f1f1f] rounded-full overflow-hidden">
+            <div id="memory-bar" class="h-2 bg-pink-500 rounded-full transition-all duration-500" style="width: <%= [(@stats[:system][:memory][:rss_mb] / 512.0 * 100), 100].min %>%"></div>
+          </div>
+        </div>
+
+        <!-- DB Pool Gauge -->
+        <div class="mb-6">
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-[#737373] text-sm">DB Pool</span>
+            <span id="stat-db-pool" class="text-sm font-medium" data-updating="false"><%= @stats[:system][:database][:connections_in_use] %>/<%= @stats[:system][:database][:pool_size] %></span>
+          </div>
+          <div class="h-2 bg-[#1f1f1f] rounded-full overflow-hidden">
+            <div id="db-bar" class="h-full bg-blue-500 rounded-full transition-all duration-500" style="width: <%= (@stats[:system][:database][:connections_in_use].to_f / @stats[:system][:database][:pool_size] * 100) %>%"></div>
+          </div>
+        </div>
+
+        <div class="border-t border-[#1f1f1f] pt-5 mt-2 space-y-4">
+          <div class="flex justify-between items-center">
+            <span class="text-[#737373] text-sm">Load Average</span>
+            <span id="stat-load-avg" class="font-medium" data-updating="false"><%= @stats[:system][:cpu][:load_average] %></span>
+          </div>
+          <div class="flex justify-between items-center">
+            <span class="text-[#737373] text-sm">Threads</span>
+            <span id="stat-threads" class="font-medium" data-updating="false"><%= @stats[:system][:process][:thread_count] %></span>
+          </div>
+          <div class="flex justify-between items-center">
+            <span class="text-[#737373] text-sm">Uptime</span>
+            <span id="stat-uptime" class="font-medium" data-updating="false"><%= distance_of_time_in_words(@stats[:system][:process][:uptime_seconds].seconds) %></span>
+          </div>
+        </div>
+
+        <div class="border-t border-[#1f1f1f] pt-4 mt-4 flex justify-between text-xs text-[#525252]">
+          <span>Ruby <%= @stats[:system][:process][:ruby_version] %></span>
+          <span>Rails <%= @stats[:system][:process][:rails_version] %></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Connections Table -->
+    <div class="card p-4 sm:p-6">
+      <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6">
+        <div>
+          <h2 class="text-base font-semibold">Active Connections</h2>
+          <p class="text-[#525252] text-sm mt-1"><span id="connections-total"><%= @stats[:connections][:details].size %></span> connected clients</p>
+        </div>
+        <div class="flex items-center gap-3">
+          <span class="text-[#525252] text-sm">Show</span>
+          <select id="connections-per-page" class="select-modern">
+            <option value="10" selected>10</option>
+            <option value="25">25</option>
+            <option value="50">50</option>
+          </select>
+        </div>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="w-full">
+          <thead>
+            <tr class="text-left text-[#525252] text-xs uppercase tracking-wider">
+              <th class="pb-4 font-medium">Connection ID</th>
+              <th class="pb-4 font-medium">IP Address</th>
+              <th class="pb-4 font-medium">Authenticated</th>
+              <th class="pb-4 font-medium">Subscriptions</th>
+              <th class="pb-4 font-medium">Connected</th>
+            </tr>
+          </thead>
+          <tbody id="connections-tbody">
+            <% @stats[:connections][:details].first(10).each do |conn| %>
+              <tr class="table-row border-t border-[#1f1f1f]">
+                <td class="py-4 font-mono text-sm text-[#a3a3a3]"><%= conn[:id][0..11] %></td>
+                <td class="py-4 text-[#a3a3a3]"><%= conn[:ip_address] || "—" %></td>
+                <td class="py-4">
+                  <% if conn[:authenticated_pubkeys].size > 0 %>
+                    <span class="pill pill-green"><%= conn[:authenticated_pubkeys].size %> pubkey<%= conn[:authenticated_pubkeys].size > 1 ? 's' : '' %></span>
+                  <% else %>
+                    <span class="pill pill-neutral">Anonymous</span>
+                  <% end %>
+                </td>
+                <td class="py-4">
+                  <span class="pill pill-purple"><%= conn[:subscription_count] %></span>
+                </td>
+                <td class="py-4 text-[#525252] text-sm" data-connected-at="<%= conn[:connected_at] %>"><%= time_ago_in_words(Time.parse(conn[:connected_at])) rescue conn[:connected_at] %> ago</td>
+              </tr>
+            <% end %>
+            <% if @stats[:connections][:details].empty? %>
+              <tr>
+                <td colspan="5" class="py-16 text-center text-[#525252]">No active connections</td>
+              </tr>
+            <% end %>
+          </tbody>
+        </table>
+      </div>
+      <div id="connections-pagination" class="flex flex-col sm:flex-row justify-between items-center gap-4 mt-6 pt-4 border-t border-[#1f1f1f] <%= 'hidden' if @stats[:connections][:details].size <= 10 %>">
+        <span class="text-sm text-[#525252]">
+          <span id="pagination-start">1</span>–<span id="pagination-end"><%= [@stats[:connections][:details].size, 10].min %></span> of <span id="pagination-total"><%= @stats[:connections][:details].size %></span>
+        </span>
+        <div class="flex gap-2">
+          <button id="pagination-prev" class="btn btn-secondary" disabled>Prev</button>
+          <button id="pagination-next" class="btn btn-secondary" <%= 'disabled' if @stats[:connections][:details].size <= 10 %>>Next</button>
+        </div>
+      </div>
+    </div>
+  <% end %>
+
+  <div class="text-center text-[#525252] text-sm">
+    Updated <span id="last-updated"><%= Time.current.strftime("%H:%M:%S") %></span>
+  </div>
+</div>
+
+<script>
+  (function() {
+    let chartInstance = null
+
+    function initEventsChart() {
+      const ctx = document.getElementById('events-chart')
+      if (!ctx) return
+
+      if (typeof Chart === 'undefined') {
+        setTimeout(initEventsChart, 100)
+        return
+      }
+
+      if (chartInstance) {
+        chartInstance.destroy()
+        chartInstance = null
+      }
+
+      try {
+        const labelsRaw = ctx.dataset.labels
+        const valuesRaw = ctx.dataset.values
+
+        if (!labelsRaw || !valuesRaw) return
+
+        const labels = JSON.parse(labelsRaw)
+        const values = JSON.parse(valuesRaw)
+
+        if (labels.length === 0) return
+
+        const formattedLabels = labels.map(dateStr => {
+          const [year, month, day] = dateStr.split('-').map(Number)
+          const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+          return `${months[month - 1]} ${day}`
+        })
+
+        chartInstance = new Chart(ctx, {
+          type: 'bar',
+          data: {
+            labels: formattedLabels,
+            datasets: [{
+              data: values,
+              backgroundColor: '#a855f7',
+              hoverBackgroundColor: '#9333ea',
+              borderRadius: 6,
+              borderSkipped: false
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: { display: false },
+              tooltip: {
+                backgroundColor: '#1a1a1a',
+                titleColor: '#fafafa',
+                bodyColor: '#a3a3a3',
+                borderColor: '#262626',
+                borderWidth: 1,
+                padding: 12,
+                cornerRadius: 8,
+                displayColors: false,
+                callbacks: {
+                  label: function(context) {
+                    return context.parsed.y.toLocaleString() + ' events'
+                  }
+                }
+              }
+            },
+            scales: {
+              y: {
+                beginAtZero: true,
+                border: { display: false },
+                grid: { color: '#1f1f1f' },
+                ticks: {
+                  color: '#525252',
+                  font: { size: 11 },
+                  callback: function(value) {
+                    if (value >= 1000000) return (value / 1000000).toFixed(1) + 'M'
+                    if (value >= 1000) return (value / 1000).toFixed(0) + 'K'
+                    return value
+                  }
+                }
+              },
+              x: {
+                border: { display: false },
+                grid: { display: false },
+                ticks: { color: '#525252', font: { size: 11 } }
+              }
+            }
+          }
+        })
+      } catch (e) {
+        console.error('Chart error:', e)
+      }
+    }
+
+    // Update progress bars
+    window.updateProgressBars = function(cpu, memoryMb, dbUsed, dbTotal) {
+      const cpuBar = document.getElementById('cpu-bar')
+      const memoryBar = document.getElementById('memory-bar')
+      const dbBar = document.getElementById('db-bar')
+
+      if (cpuBar) cpuBar.style.width = Math.min(cpu, 100) + '%'
+      if (memoryBar) memoryBar.style.width = Math.min((memoryMb / 512) * 100, 100) + '%'
+      if (dbBar && dbTotal > 0) dbBar.style.width = (dbUsed / dbTotal * 100) + '%'
+    }
+
+    document.addEventListener('DOMContentLoaded', initEventsChart)
+    document.addEventListener('turbo:load', initEventsChart)
+    document.addEventListener('turbo:render', initEventsChart)
+
+    if (document.readyState !== 'loading') initEventsChart()
+  })()
+</script>

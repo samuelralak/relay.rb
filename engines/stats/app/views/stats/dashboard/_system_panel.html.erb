@@ -1,0 +1,33 @@
+<div class="bg-gray-800 rounded-lg p-6">
+  <h2 class="text-lg font-semibold mb-4 text-gray-200">System Resources</h2>
+  <div class="space-y-4">
+    <div class="flex justify-between items-center">
+      <span class="text-gray-400">Memory (RSS)</span>
+      <span id="stat-memory-panel" class="font-mono"><%= system[:memory][:rss_mb] %> MB</span>
+    </div>
+    <div class="flex justify-between items-center">
+      <span class="text-gray-400">CPU Usage</span>
+      <span id="stat-cpu" class="font-mono"><%= system[:cpu][:load_percent] %>%</span>
+    </div>
+    <div class="flex justify-between items-center">
+      <span class="text-gray-400">Load Average</span>
+      <span id="stat-load-avg" class="font-mono"><%= system[:cpu][:load_average] %></span>
+    </div>
+    <div class="flex justify-between items-center">
+      <span class="text-gray-400">Threads</span>
+      <span id="stat-threads" class="font-mono"><%= system[:process][:thread_count] %></span>
+    </div>
+    <div class="flex justify-between items-center">
+      <span class="text-gray-400">Uptime</span>
+      <span id="stat-uptime" class="font-mono"><%= distance_of_time_in_words(system[:process][:uptime_seconds].seconds) %></span>
+    </div>
+    <div class="flex justify-between items-center">
+      <span class="text-gray-400">DB Pool</span>
+      <span id="stat-db-pool" class="font-mono"><%= system[:database][:connections_in_use] %>/<%= system[:database][:pool_size] %></span>
+    </div>
+    <div class="flex justify-between items-center text-xs text-gray-500">
+      <span>Ruby <%= system[:process][:ruby_version] %></span>
+      <span>Rails <%= system[:process][:rails_version] %></span>
+    </div>
+  </div>
+</div>

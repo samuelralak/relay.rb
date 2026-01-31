@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sign in — <%= Stats.dashboard_title %></title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Mona+Sans:ital,wght@0,200..900;1,200..900&display=swap" rel="stylesheet">
+  <style>
+
+    *, *::before, *::after {
+      font-family: 'Mona Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif !important;
+    }
+
+    body {
+      background: #0c0c0c;
+      font-family: 'Mona Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+    }
+
+    .input {
+      background: #1a1a1a;
+      border: 1px solid #262626;
+      border-radius: 10px;
+      padding: 0.875rem 1rem;
+      color: #fafafa;
+      font-size: 0.9375rem;
+      transition: border-color 0.2s;
+    }
+
+    .input:focus {
+      outline: none;
+      border-color: #a855f7;
+    }
+
+    .input::placeholder {
+      color: #525252;
+    }
+
+    .btn-primary {
+      background: #a855f7;
+      border-radius: 10px;
+      padding: 0.875rem 1.5rem;
+      color: white;
+      font-weight: 500;
+      font-size: 0.9375rem;
+      transition: background 0.2s;
+    }
+
+    .btn-primary:hover {
+      background: #9333ea;
+    }
+  </style>
+</head>
+<body class="min-h-screen flex items-center justify-center p-6">
+  <div class="w-full max-w-sm">
+    <div class="text-center mb-10">
+      <div class="w-14 h-14 rounded-2xl bg-[#a855f7] flex items-center justify-center mx-auto mb-6">
+        <svg class="w-8 h-8 text-white" fill="currentColor" viewBox="0 0 24 24">
+          <path d="M13 10V3L4 14h7v7l9-11h-7z"/>
+        </svg>
+      </div>
+      <h1 class="text-2xl font-semibold text-white tracking-tight"><%= Stats.dashboard_title %></h1>
+      <p class="text-[#737373] mt-2">Sign in to access the dashboard</p>
+    </div>
+
+    <% if flash[:alert] %>
+      <div class="bg-[#141414] border border-[#262626] border-l-4 border-l-red-500 rounded-xl px-4 py-3 mb-6">
+        <span class="text-red-400 text-sm"><%= flash[:alert] %></span>
+      </div>
+    <% end %>
+
+    <% if flash[:notice] %>
+      <div class="bg-[#141414] border border-[#262626] border-l-4 border-l-green-500 rounded-xl px-4 py-3 mb-6">
+        <span class="text-green-400 text-sm"><%= flash[:notice] %></span>
+      </div>
+    <% end %>
+
+    <%= form_tag authenticate_path, method: :post do %>
+      <div class="space-y-4">
+        <div>
+          <label for="token" class="block text-sm font-medium text-[#a3a3a3] mb-2">API Key</label>
+          <input type="password" name="token" id="token" required
+                 class="input w-full"
+                 placeholder="Enter your API key">
+        </div>
+        <button type="submit" class="btn-primary w-full">
+          Sign in
+        </button>
+      </div>
+    <% end %>
+
+    <p class="mt-8 text-center text-sm text-[#525252]">
+      Use your relay API key to authenticate
+    </p>
+  </div>
+</body>
+</html>
