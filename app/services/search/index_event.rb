@@ -39,7 +39,7 @@ module Search
     end
 
     def extract_searchable_tags
-      event.tags.filter_map { |t| t[1] if t.is_a?(Array) && t.size >= 2 }
+      event.tags.filter_map { |t| t[1] if t.is_a?(Array) && t.size >= 2 && t[1].bytesize <= 1000 }
     end
 
     def extract_display_name

@@ -47,7 +47,7 @@ module Search
         pubkey: event.pubkey,
         kind: event.kind,
         content: event.content,
-        tags: event.tags.filter_map { |t| t[1] if t.is_a?(Array) && t.size >= 2 },
+        tags: event.tags.filter_map { |t| t[1] if t.is_a?(Array) && t.size >= 2 && t[1].bytesize <= 1000 },
         nostr_created_at: event.nostr_created_at.to_i
       }
 
