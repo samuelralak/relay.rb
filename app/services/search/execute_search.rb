@@ -6,7 +6,7 @@ module Search
 
     option :search_query, type: Types::String
     option :filter, type: Types::Hash, default: -> { {} }
-    option :limit, type: Types::Integer, default: -> { 100 }
+    option :limit, type: Types::Integer, default: -> { 500 }
 
     def call
       return Failure(:search_disabled) unless RelaySearch::Client.available?
