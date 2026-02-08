@@ -45,6 +45,35 @@ namespace :search do
     end
   end
 
+  desc "Update OpenSearch mapping (adds new fields without dropping index)"
+  task update_mapping: :environment do
+    client = RelaySearch::Client.client
+    index = RelaySearch::IndexConfig::INDEX_NAME
+
+    unless client.indices.exists?(index:)
+      puts "Index '#{index}' does not exist. Run search:create_index first."
+      next
+    end
+
+    client.indices.put_mapping(
+      index:,
+      body: { properties: RelaySearch::IndexConfig::MAPPINGS[:properties] }
+    )
+    puts "Updated mapping for '#{index}'"
+  end
+
+  desc "Reindex only kind:0 metadata events (for display_name population)"
+  task reindex_profiles: :environment do
+    result = Search::BulkIndexEvents.call(scope: Event.where(kind: Events::Kinds::METADATA))
+    if result.success?
+      values = result.value!
+      puts "Reindexed #{values[:indexed]} kind:0 events"
+      puts "Errors: #{values[:errors]}" if values[:errors] > 0
+    else
+      puts "Reindex failed: #{result.failure}"
+    end
+  end
+
   desc "Show OpenSearch status"
   task status: :environment do
     puts "OpenSearch Status"

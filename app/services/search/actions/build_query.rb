@@ -7,6 +7,9 @@ module Search
       option :filter, type: Types::Hash
       option :limit, type: Types::Integer
 
+      DISPLAY_NAME_BOOST = 2
+      PUBKEY_AUTHOR_BOOST = 3
+
       def call
         Success(query: build_query, size: limit)
       end
@@ -17,8 +20,10 @@ module Search
         {
           bool: {
             must: must_clauses,
+            should: should_clauses,
             must_not: must_not_clauses,
-            filter: filter_clauses
+            filter: filter_clauses,
+            minimum_should_match:
           }.compact_blank
         }
       end
@@ -26,28 +31,56 @@ module Search
       def must_clauses
         clauses = []
 
-        # Terms (AND logic - all must match)
-        parsed_query[:terms]&.each do |term|
-          clauses << { match: { content: { query: term, operator: "and" } } }
+        # Single efficient match for all terms combined on content
+        combined = parsed_query[:terms].join(" ")
+        if combined.present?
+          clauses << { match: { content: { query: combined, operator: "and" } } }
         end
 
-        # Phrases (exact sequence)
-        parsed_query[:phrases]&.each do |phrase|
-          clauses << { match_phrase: { content: phrase } }
+        # Advanced queries also require exact phrase matches
+        unless plain_query?
+          parsed_query[:phrases]&.each do |phrase|
+            clauses << { match_phrase: { content: phrase } }
+          end
         end
 
         clauses.presence
       end
 
+      def should_clauses
+        clauses = []
+
+        # Boost kind:0 profile events with matching display_name
+        combined_terms = parsed_query[:terms].join(" ")
+        if combined_terms.present?
+          clauses << { match: { display_name: { query: combined_terms, boost: DISPLAY_NAME_BOOST } } }
+        end
+
+        # Pubkey terms: boost notes by that author + content/tag mentions
+        parsed_query[:pubkey_terms]&.each do |hex|
+          clauses << { term: { pubkey: { value: hex, boost: PUBKEY_AUTHOR_BOOST } } }
+          clauses << { match: { content: { query: hex, boost: 1 } } }
+          clauses << { term: { tags: { value: hex, boost: 1 } } }
+        end
+
+        clauses.presence
+      end
+
+      # When ONLY pubkey_terms exist (no regular terms/phrases), at least one
+      # should clause must match. Otherwise should clauses just boost relevance.
+      def minimum_should_match
+        if parsed_query[:terms].blank? && parsed_query[:phrases].blank? && parsed_query[:pubkey_terms].present?
+          1
+        end
+      end
+
       def must_not_clauses
         clauses = []
 
-        # Excluded terms
         parsed_query[:exclusions]&.each do |term|
           clauses << { match: { content: term } }
         end
 
-        # Excluded phrases (e.g., -"exact phrase")
         parsed_query[:excluded_phrases]&.each do |phrase|
           clauses << { match_phrase: { content: phrase } }
         end
@@ -71,6 +104,10 @@ module Search
         end
 
         clauses.presence
+      end
+
+      def plain_query?
+        parsed_query[:query_type] == :plain
       end
     end
   end

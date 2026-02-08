@@ -15,6 +15,11 @@ module RelaySearch
           analyzer: "standard",
           fields: { keyword: { type: "keyword", ignore_above: 256 } }
         },
+        display_name: {
+          type: "text",
+          analyzer: "standard",
+          fields: { keyword: { type: "keyword", ignore_above: 100 } }
+        },
         tags: { type: "keyword" },
         nostr_created_at: { type: "date", format: "epoch_second" }
       }

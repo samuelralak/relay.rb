@@ -42,17 +42,28 @@ module Search
     private
 
     def bulk_action(event)
+      body = {
+        event_id: event.event_id,
+        pubkey: event.pubkey,
+        kind: event.kind,
+        content: event.content,
+        tags: event.tags.filter_map { |t| t[1] if t.is_a?(Array) && t.size >= 2 },
+        nostr_created_at: event.nostr_created_at.to_i
+      }
+
+      body[:display_name] = extract_display_name(event) if event.kind == Events::Kinds::METADATA
+
       [
         { index: { _index: RelaySearch::IndexConfig::INDEX_NAME, _id: event.event_id } },
-        {
-          event_id: event.event_id,
-          pubkey: event.pubkey,
-          kind: event.kind,
-          content: event.content,
-          tags: event.tags.filter_map { |t| t[1] if t.is_a?(Array) && t.size >= 2 },
-          nostr_created_at: event.nostr_created_at.to_i
-        }
+        body
       ]
+    end
+
+    def extract_display_name(event)
+      metadata = JSON.parse(event.content)
+      (metadata["display_name"].presence || metadata["name"]).to_s.strip.presence
+    rescue JSON::ParserError
+      nil
     end
   end
 end

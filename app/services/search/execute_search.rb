@@ -15,45 +15,53 @@ module Search
       # 1. Parse query
       parsed = Actions::ParseQuery.call(query: search_query).value!
 
-      # 2. Require at least one positive search term (term or phrase)
-      # Prevents overly broad queries with only exclusions or extensions
-      return Failure(:empty_query) if parsed[:terms].empty? && parsed[:phrases].empty?
+      # 2. Require at least one positive search signal
+      # (term, phrase, OR pubkey term)
+      has_positive = parsed[:terms].any? || parsed[:phrases].any? || parsed[:pubkey_terms].any?
+      return Failure(:empty_query) unless has_positive
 
-      # 3. Check for include:spam extension
+      # 3. Resolve identity if hinted (username → pubkeys)
+      parsed = resolve_identity_if_needed(parsed)
+
+      # 4. Check for include:spam extension
       include_spam = parsed[:extensions]["include"] == "spam"
 
-      # 4. Merge from: extension authors with filter authors
+      # 5. Merge from: extension authors with filter authors
       effective_filter = merge_from_authors(filter, parsed[:from_authors])
 
-      # 5. Enforce search_max_limit
+      # 6. Enforce search_max_limit
       effective_limit = [ limit, NostrRelay::Config.search_max_limit ].min
 
-      # 6. Build OpenSearch query
+      # 7. Build OpenSearch query
       query_result = Actions::BuildQuery.call(
         parsed_query: parsed,
         filter: effective_filter,
         limit: effective_limit
       )
 
-      # 7. Execute search
+      # 8. Execute search with relevance + recency sorting
       response = RelaySearch::Client.client.search(
         index: RelaySearch::IndexConfig::INDEX_NAME,
         body: {
           query: query_result.value![:query],
           size: query_result.value![:size],
-          sort: [ { _score: "desc" } ]  # Relevance ordering (NIP-50 requirement)
+          sort: [
+            { _score: "desc" },
+            { nostr_created_at: "desc" }
+          ],
+          _source: [ "event_id" ]
         }
       )
 
-      # 8. Extract event IDs preserving relevance order
+      # 9. Extract event IDs preserving relevance order
       event_ids = response["hits"]["hits"].map { |h| h["_source"]["event_id"] }
       return Success(events: [], total: 0) if event_ids.empty?
 
-      # 9. Fetch events from DB, preserving OpenSearch relevance order
-      events_by_id = Event.where(event_id: event_ids).index_by(&:event_id)
+      # 10. Fetch events from DB, preserving OpenSearch relevance order
+      events_by_id = Event.active.where(event_id: event_ids).index_by(&:event_id)
       ordered_events = event_ids.filter_map { |id| events_by_id[id] }
 
-      # 10. Apply spam filtering unless include:spam
+      # 11. Apply spam filtering unless include:spam
       ordered_events = filter_spam(ordered_events) unless include_spam
 
       Success(events: ordered_events, total: response["hits"]["total"]["value"])
@@ -63,6 +71,24 @@ module Search
     end
 
     private
+
+    # When the query looks like a username search (identity_hint)
+    # and no pubkeys were already extracted, try resolving the term
+    # as a username via kind:0 profile display_name matches.
+    def resolve_identity_if_needed(parsed)
+      return parsed unless parsed[:identity_hint]
+      return parsed if parsed[:pubkey_terms].any?
+      return parsed if parsed[:terms].empty?
+
+      username = parsed[:terms].first
+      result = Actions::ResolveIdentity.call(username:)
+
+      if result.success? && result.value![:pubkeys].any?
+        parsed.merge(pubkey_terms: result.value![:pubkeys])
+      else
+        parsed
+      end
+    end
 
     # Merge from: extension authors with existing filter authors.
     # If both exist, uses intersection (AND logic).

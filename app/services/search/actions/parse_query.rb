@@ -7,14 +7,27 @@ module Search
 
       def call
         extensions = extract_extensions
+        phrases = extract_phrases
+        exclusions = extract_exclusions
+        excluded_phrases = extract_excluded_phrases
+        from_authors = extract_from_authors(extensions)
+
+        raw_terms = extract_terms
+        remaining_terms, pubkey_terms = partition_pubkey_terms(raw_terms)
+
+        query_type = classify_query(phrases:, exclusions:, excluded_phrases:)
+        hint = identity_hint?(remaining_terms, pubkey_terms)
 
         Success(
-          terms: extract_terms,
-          phrases: extract_phrases,
-          exclusions: extract_exclusions,
-          excluded_phrases: extract_excluded_phrases,
+          terms: remaining_terms,
+          phrases:,
+          exclusions:,
+          excluded_phrases:,
           extensions:,
-          from_authors: extract_from_authors(extensions)
+          from_authors:,
+          pubkey_terms:,
+          query_type:,
+          identity_hint: hint
         )
       end
 
@@ -47,6 +60,39 @@ module Search
         cleaned.gsub!(/-\w+/, "")               # Remove exclusions
         cleaned.gsub!(/\w+:\S+/, "")            # Remove extensions
         cleaned.split.map(&:downcase).reject(&:blank?)
+      end
+
+      # Detect and extract pubkey-like terms (npub or 64-char hex).
+      # These are useless for content search but valuable for author filtering.
+      def partition_pubkey_terms(terms)
+        pubkeys = []
+        remaining = []
+
+        terms.each do |term|
+          result = ConvertNpub.call(identifier: term)
+          if result.success?
+            pubkeys << result.value![:pubkey]
+          else
+            remaining << term
+          end
+        end
+
+        [ remaining, pubkeys ]
+      end
+
+      # Only phrases and exclusions affect query structure (must/must_not clauses).
+      # Extensions like from:, include: are handled separately and don't change
+      # whether we use single-match vs per-term query optimization.
+      def classify_query(phrases:, exclusions:, excluded_phrases:)
+        phrases.empty? && exclusions.empty? && excluded_phrases.empty? ? :plain : :advanced
+      end
+
+      # Heuristic: single short alphanumeric term is likely a username search,
+      # or pubkey terms are present (explicit identity lookup).
+      def identity_hint?(terms, pubkey_terms)
+        return true if pubkey_terms.any?
+
+        terms.size == 1 && terms.first.length <= 30 && terms.first.match?(/\A[a-z0-9_.-]+\z/)
       end
 
       # Extract and convert from: extension to hex pubkeys.

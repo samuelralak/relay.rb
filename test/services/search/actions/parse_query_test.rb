@@ -101,6 +101,122 @@ module Search
       end
 
       # =========================================================================
+      # Pubkey Term Detection
+      # =========================================================================
+
+      test "extracts npub from terms into pubkey_terms" do
+        result = ParseQuery.call(query: KNOWN_NPUB)
+
+        assert result.success?
+        assert_equal [ KNOWN_HEX ], result.value![:pubkey_terms]
+        assert_empty result.value![:terms]
+      end
+
+      test "extracts hex pubkey from terms into pubkey_terms" do
+        result = ParseQuery.call(query: KNOWN_HEX)
+
+        assert result.success?
+        assert_equal [ KNOWN_HEX ], result.value![:pubkey_terms]
+        assert_empty result.value![:terms]
+      end
+
+      test "keeps regular terms separate from pubkey_terms" do
+        result = ParseQuery.call(query: "bitcoin #{KNOWN_HEX}")
+
+        assert result.success?
+        assert_equal [ "bitcoin" ], result.value![:terms]
+        assert_equal [ KNOWN_HEX ], result.value![:pubkey_terms]
+      end
+
+      test "non-pubkey terms stay in terms" do
+        result = ParseQuery.call(query: "bitcoin lightning")
+
+        assert result.success?
+        assert_equal %w[bitcoin lightning], result.value![:terms]
+        assert_empty result.value![:pubkey_terms]
+      end
+
+      # =========================================================================
+      # Query Type Classification
+      # =========================================================================
+
+      test "classifies simple terms as plain query_type" do
+        result = ParseQuery.call(query: "bitcoin lightning")
+
+        assert_equal :plain, result.value![:query_type]
+      end
+
+      test "classifies query with phrases as advanced query_type" do
+        result = ParseQuery.call(query: '"lightning network" bitcoin')
+
+        assert_equal :advanced, result.value![:query_type]
+      end
+
+      test "classifies query with exclusions as advanced query_type" do
+        result = ParseQuery.call(query: "bitcoin -scam")
+
+        assert_equal :advanced, result.value![:query_type]
+      end
+
+      test "classifies query with excluded phrases as advanced query_type" do
+        result = ParseQuery.call(query: 'bitcoin -"pump and dump"')
+
+        assert_equal :advanced, result.value![:query_type]
+      end
+
+      test "include:spam does not make query advanced" do
+        result = ParseQuery.call(query: "bitcoin include:spam")
+
+        assert_equal :plain, result.value![:query_type]
+      end
+
+      test "from: extension does not make query advanced" do
+        result = ParseQuery.call(query: "bitcoin from:#{KNOWN_NPUB}")
+
+        assert_equal :plain, result.value![:query_type]
+      end
+
+      # =========================================================================
+      # Identity Hint
+      # =========================================================================
+
+      test "single short term triggers identity_hint" do
+        result = ParseQuery.call(query: "fiatjaf")
+
+        assert result.value![:identity_hint]
+      end
+
+      test "single term with dots triggers identity_hint" do
+        result = ParseQuery.call(query: "hodl.er")
+
+        assert result.value![:identity_hint]
+      end
+
+      test "multiple terms do not trigger identity_hint" do
+        result = ParseQuery.call(query: "bitcoin lightning")
+
+        refute result.value![:identity_hint]
+      end
+
+      test "pubkey term triggers identity_hint" do
+        result = ParseQuery.call(query: KNOWN_HEX)
+
+        assert result.value![:identity_hint]
+      end
+
+      test "long term does not trigger identity_hint" do
+        result = ParseQuery.call(query: "a" * 31)
+
+        refute result.value![:identity_hint]
+      end
+
+      test "term with spaces does not trigger identity_hint" do
+        result = ParseQuery.call(query: "hello world")
+
+        refute result.value![:identity_hint]
+      end
+
+      # =========================================================================
       # Complex Queries
       # =========================================================================
 
@@ -117,6 +233,8 @@ module Search
         assert_equal [ "pump and dump" ], values[:excluded_phrases]
         assert_equal [ KNOWN_HEX ], values[:from_authors]
         assert_equal "spam", values[:extensions]["include"]
+        assert_empty values[:pubkey_terms]
+        assert_equal :advanced, values[:query_type]
       end
     end
   end

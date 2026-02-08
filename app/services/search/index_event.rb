@@ -25,7 +25,7 @@ module Search
     private
 
     def document_body
-      {
+      body = {
         event_id: event.event_id,
         pubkey: event.pubkey,
         kind: event.kind,
@@ -33,10 +33,20 @@ module Search
         tags: extract_searchable_tags,
         nostr_created_at: event.nostr_created_at.to_i
       }
+
+      body[:display_name] = extract_display_name if event.kind == Events::Kinds::METADATA
+      body
     end
 
     def extract_searchable_tags
       event.tags.filter_map { |t| t[1] if t.is_a?(Array) && t.size >= 2 }
+    end
+
+    def extract_display_name
+      metadata = JSON.parse(event.content)
+      (metadata["display_name"].presence || metadata["name"]).to_s.strip.presence
+    rescue JSON::ParserError
+      nil
     end
   end
 end
