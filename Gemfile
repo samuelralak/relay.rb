@@ -64,7 +64,7 @@ gem "eventmachine", "~> 1.2"
 # Service object infrastructure
 gem "dry-types", "~> 1.7"
 gem "dry-initializer", "~> 3.1"
-gem "dry-struct", "~> 1.6"
+gem "dry-struct", "~> 1.8"
 gem "dry-initializer-rails", "~> 3.1"
 gem "dry-monads", "~> 1.6"
 gem "dry-validation", "~> 1.10"
